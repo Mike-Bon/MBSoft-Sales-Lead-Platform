@@ -8,8 +8,13 @@ Route::middleware('guest')->group(function () {
     Volt::route('login', 'auth.login')
         ->name('login');
 
-    Volt::route('register', 'auth.register')
-        ->name('register');
+    // Public self-registration is intentionally disabled from Phase 2
+    // onward: this application has a managed organisational structure
+    // (Manager, Team Heads, Team Members), and every account must be
+    // created by the Manager with an explicit role and team via
+    // /users/create (see UserPolicy::create, Manager only). An
+    // unmanaged self-registered account would have no role/team and
+    // would not fit that model.
 
     Volt::route('forgot-password', 'auth.forgot-password')
         ->name('password.request');

@@ -14,6 +14,13 @@
             <flux:navlist variant="outline">
                 <flux:navlist.group heading="Platform" class="grid">
                     <flux:navlist.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>Dashboard</flux:navlist.item>
+                    <flux:navlist.item icon="user" :href="route('organisation.profile')" :current="request()->routeIs('organisation.profile')" wire:navigate>Profile</flux:navlist.item>
+                    @can('viewAny', App\Models\Team::class)
+                        <flux:navlist.item icon="users" :href="route('organisation.teams.index')" :current="request()->routeIs('organisation.teams.*')" wire:navigate>Teams</flux:navlist.item>
+                    @endcan
+                    @can('viewAny', App\Models\User::class)
+                        <flux:navlist.item icon="identification" :href="route('organisation.users.index')" :current="request()->routeIs('organisation.users.*')" wire:navigate>Users</flux:navlist.item>
+                    @endcan
                 </flux:navlist.group>
             </flux:navlist>
 
