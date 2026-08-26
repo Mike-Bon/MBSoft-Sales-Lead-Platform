@@ -7,15 +7,16 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\PerformanceAuthorizer;
 use App\Services\PerformanceService;
+use App\Support\PeriodSelection;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 /**
  * A verification page for Phase 4's calculation engine (STEP 21) — not
- * the final Manager/Team Head dashboard. Every number shown here comes
- * from PerformanceService, the same authoritative source Phase 5's real
- * dashboards will use.
+ * the final Manager/Team Head dashboard (that's
+ * App\Http\Controllers\DashboardController, Phase 5). Every number shown
+ * here comes from PerformanceService, the same authoritative source the
+ * real dashboards use.
  */
 class PerformanceController extends Controller
 {
@@ -27,34 +28,34 @@ class PerformanceController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-
-        [$periodStart, $periodEnd] = $this->resolvePeriod($request);
+        $period = PeriodSelection::fromRequest($request);
 
         $organisation = null;
         $teams = [];
         $individual = null;
 
         if ($this->authorizer->canViewOrganisation($user)) {
-            $organisation = $this->performance->forOrganisation($periodStart, $periodEnd);
+            $organisation = $this->performance->forOrganisation($period->start, $period->end);
 
             foreach (Team::orderBy('name')->get() as $team) {
-                $teams[] = ['team' => $team, 'snapshot' => $this->performance->forTeam($team, $periodStart, $periodEnd)];
+                $teams[] = ['team' => $team, 'snapshot' => $this->performance->forTeam($team, $period->start, $period->end)];
             }
         } elseif ($user->team_id !== null) {
             $team = Team::find($user->team_id);
 
             if ($team && $this->authorizer->canViewTeam($user, $team)) {
-                $teams[] = ['team' => $team, 'snapshot' => $this->performance->forTeam($team, $periodStart, $periodEnd)];
+                $teams[] = ['team' => $team, 'snapshot' => $this->performance->forTeam($team, $period->start, $period->end)];
             }
         }
 
         if (! $user->isManager()) {
-            $individual = ['user' => $user, 'snapshot' => $this->performance->forIndividual($user, $periodStart, $periodEnd)];
+            $individual = ['user' => $user, 'snapshot' => $this->performance->forIndividual($user, $period->start, $period->end)];
         }
 
         return view('performance.index', [
-            'periodStart' => $periodStart,
-            'periodEnd' => $periodEnd,
+            'period' => $period,
+            'periodStart' => $period->start,
+            'periodEnd' => $period->end,
             'organisation' => $organisation,
             'teams' => $teams,
             'individual' => $individual,
@@ -65,30 +66,14 @@ class PerformanceController extends Controller
     {
         $this->authorizer->authorizeIndividual($request->user(), $user);
 
-        [$periodStart, $periodEnd] = $this->resolvePeriod($request);
+        $period = PeriodSelection::fromRequest($request);
 
         return view('performance.individual', [
             'targetUser' => $user,
-            'periodStart' => $periodStart,
-            'periodEnd' => $periodEnd,
-            'snapshot' => $this->performance->forIndividual($user, $periodStart, $periodEnd),
+            'period' => $period,
+            'periodStart' => $period->start,
+            'periodEnd' => $period->end,
+            'snapshot' => $this->performance->forIndividual($user, $period->start, $period->end),
         ]);
-    }
-
-    /**
-     * @return array{0: Carbon, 1: Carbon}
-     */
-    private function resolvePeriod(Request $request): array
-    {
-        $request->validate([
-            'period_start' => ['nullable', 'date'],
-            'period_end' => ['nullable', 'date', 'after_or_equal:period_start'],
-        ]);
-
-        if ($request->filled('period_start') && $request->filled('period_end')) {
-            return [Carbon::parse($request->query('period_start')), Carbon::parse($request->query('period_end'))];
-        }
-
-        return [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()];
     }
 }

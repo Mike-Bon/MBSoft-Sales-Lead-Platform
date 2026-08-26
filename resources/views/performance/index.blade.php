@@ -36,7 +36,7 @@
                             <flux:table.cell>{{ $snapshot->hasTarget ? $snapshot->currency.' '.number_format($snapshot->target, 2) : '—' }}</flux:table.cell>
                             <flux:table.cell>{{ $snapshot->currency }} {{ number_format($snapshot->actual, 2) }}</flux:table.cell>
                             <flux:table.cell>{{ $snapshot->achievementPercent !== null ? number_format($snapshot->achievementPercent, 1).'%' : '—' }}</flux:table.cell>
-                            <flux:table.cell>{{ $snapshot->hasTarget ? ($snapshot->gap < 0 ? '+' : '').number_format(abs($snapshot->gap), 2) : '—' }}</flux:table.cell>
+                            <flux:table.cell>{{ $snapshot->hasTarget ? ($snapshot->gap < 0 ? '+' : '').$snapshot->currency.' '.number_format(abs($snapshot->gap), 2) : '—' }}</flux:table.cell>
                             <flux:table.cell>{{ $snapshot->currency }} {{ number_format($snapshot->pipeline, 2) }}</flux:table.cell>
                             <flux:table.cell>{{ $snapshot->pipelineCoverage !== null ? number_format($snapshot->pipelineCoverage, 2).'×' : '—' }}</flux:table.cell>
                         </flux:table.row>

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Performance\PerformanceController;
 use App\Http\Controllers\Performance\TargetController;
+use App\Http\Controllers\Performance\TeamPerformanceController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -23,4 +24,9 @@ Route::middleware(['auth', 'verified'])->name('performance.')->group(function ()
         Route::get('/', [PerformanceController::class, 'index'])->name('index');
         Route::get('/users/{user}', [PerformanceController::class, 'individual'])->name('individual');
     });
+
+    // STEP 14: the team performance drill-down (Manager: any team; Team
+    // Head: only their own — enforced by PerformanceAuthorizer, not by
+    // this route).
+    Route::get('/teams/{team}/performance', [TeamPerformanceController::class, 'show'])->name('teams.show');
 });

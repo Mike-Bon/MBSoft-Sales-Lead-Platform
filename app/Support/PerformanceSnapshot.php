@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\ManagementSignal;
 use App\Enums\PerformancePeriodState;
 use Illuminate\Support\Carbon;
 
@@ -42,5 +43,39 @@ final readonly class PerformanceSnapshot
     public function isOverAchieved(): bool
     {
         return $this->hasTarget && $this->gap < 0;
+    }
+
+    /**
+     * See App\Enums\ManagementSignal for the exact documented rules.
+     * Pure classification of already-computed fields — never a new
+     * calculation.
+     */
+    public function managementSignal(): ManagementSignal
+    {
+        if (! $this->hasTarget || $this->periodState === PerformancePeriodState::Future) {
+            return ManagementSignal::NoTarget;
+        }
+
+        if ($this->gap <= 0) {
+            return ManagementSignal::TargetAchieved;
+        }
+
+        if ($this->periodState === PerformancePeriodState::Completed) {
+            return ManagementSignal::Behind;
+        }
+
+        $expectedPace = $this->totalDays > 0 ? ($this->elapsedDays / $this->totalDays) * 100 : 0.0;
+
+        if ($expectedPace <= 0) {
+            return ManagementSignal::NoTarget;
+        }
+
+        $paceRatio = ($this->achievementPercent ?? 0.0) / $expectedPace;
+
+        return match (true) {
+            $paceRatio >= 1.0 => ManagementSignal::OnTrack,
+            $paceRatio >= 0.8 => ManagementSignal::AtRisk,
+            default => ManagementSignal::Behind,
+        };
     }
 }
