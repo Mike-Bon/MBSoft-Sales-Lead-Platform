@@ -10,13 +10,13 @@
 
             <flux:select name="role" label="Role" required>
                 @foreach ($roles as $role)
-                    <flux:select.option value="{{ $role->value }}" @selected(old('role', $targetUser->role->value) === $role->value)>{{ $role->label() }}</flux:select.option>
+                    <flux:select.option value="{{ $role->value }}" :selected="old('role', $targetUser->role->value) === $role->value">{{ $role->label() }}</flux:select.option>
                 @endforeach
             </flux:select>
 
             <flux:select name="team_id" label="Team" placeholder="No team (Manager only)">
                 @foreach ($teams as $team)
-                    <flux:select.option value="{{ $team->id }}" @selected((string) old('team_id', $targetUser->team_id) === (string) $team->id)>{{ $team->name }}</flux:select.option>
+                    <flux:select.option value="{{ $team->id }}" :selected="(string) old('team_id', $targetUser->team_id) === (string) $team->id">{{ $team->name }}</flux:select.option>
                 @endforeach
             </flux:select>
 

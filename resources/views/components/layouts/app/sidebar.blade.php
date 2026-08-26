@@ -15,6 +15,11 @@
                 <flux:navlist.group heading="Platform" class="grid">
                     <flux:navlist.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>Dashboard</flux:navlist.item>
                     <flux:navlist.item icon="user" :href="route('organisation.profile')" :current="request()->routeIs('organisation.profile')" wire:navigate>Profile</flux:navlist.item>
+                    <flux:navlist.item icon="briefcase" :href="route('crm.organizations.index')" :current="request()->routeIs('crm.organizations.*')" wire:navigate>Organizations</flux:navlist.item>
+                    <flux:navlist.item icon="user-circle" :href="route('crm.contacts.index')" :current="request()->routeIs('crm.contacts.*')" wire:navigate>Contacts</flux:navlist.item>
+                    <flux:navlist.item icon="funnel" :href="route('crm.leads.index')" :current="request()->routeIs('crm.leads.*')" wire:navigate>Leads</flux:navlist.item>
+                    <flux:navlist.item icon="currency-dollar" :href="route('crm.opportunities.index')" :current="request()->routeIs('crm.opportunities.*')" wire:navigate>Opportunities</flux:navlist.item>
+                    <flux:navlist.item icon="clock" :href="route('crm.activities.index')" :current="request()->routeIs('crm.activities.*')" wire:navigate>Activities</flux:navlist.item>
                     @can('viewAny', App\Models\Team::class)
                         <flux:navlist.item icon="users" :href="route('organisation.teams.index')" :current="request()->routeIs('organisation.teams.*')" wire:navigate>Teams</flux:navlist.item>
                     @endcan

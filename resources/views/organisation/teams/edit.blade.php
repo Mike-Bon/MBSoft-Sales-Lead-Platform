@@ -13,7 +13,7 @@
 
             <flux:select name="status" label="Status" required>
                 @foreach (\App\Enums\TeamStatus::cases() as $status)
-                    <flux:select.option value="{{ $status->value }}" @selected(old('status', $team->status->value) === $status->value)>{{ $status->label() }}</flux:select.option>
+                    <flux:select.option value="{{ $status->value }}" :selected="old('status', $team->status->value) === $status->value">{{ $status->label() }}</flux:select.option>
                 @endforeach
             </flux:select>
 
