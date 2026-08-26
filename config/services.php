@@ -55,4 +55,25 @@ return [
         'api_version' => env('WHATSAPP_API_VERSION', 'v20.0'),
     ],
 
+    // ── Phase 7: AI provider (Anthropic Claude) ─────────────────────
+    // LLM_PROVIDER/LLM_API_KEY/LLM_MODEL/LLM_MAX_TOKENS were reserved as
+    // generic names since Phase 1; the concrete first implementation is
+    // Anthropic (AppServiceProvider binds App\Contracts\Ai\LlmProvider
+    // to App\Services\Ai\Providers\AnthropicProvider). Never hard-coded
+    // elsewhere — swapping provider/model only ever touches this file
+    // and the .env value. See docs/AI_ASSISTANT.md.
+    'anthropic' => [
+        'api_key' => env('LLM_API_KEY'),
+        'model' => env('LLM_MODEL', 'claude-sonnet-4-5-20250929'),
+        'max_tokens' => env('LLM_MAX_TOKENS', 1024),
+        'timeout' => env('LLM_TIMEOUT_SECONDS', 30),
+    ],
+
+    // Agent execution safeguards (STEP 27) — not provider-specific.
+    'ai' => [
+        'max_tool_iterations' => env('AI_MAX_TOOL_ITERATIONS', 6),
+        'max_message_length' => env('AI_MAX_MESSAGE_LENGTH', 2000),
+        'history_turns' => env('AI_HISTORY_TURNS', 6),
+    ],
+
 ];

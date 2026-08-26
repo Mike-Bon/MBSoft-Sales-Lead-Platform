@@ -21,6 +21,9 @@
                 <flux:navbar.item icon="chat-bubble-left-right" href="{{ route('communications.index') }}" :current="request()->routeIs('communications.*')" wire:navigate>
                     Communications
                 </flux:navbar.item>
+                <flux:navbar.item icon="sparkles" href="{{ route('assistant.show') }}" :current="request()->routeIs('assistant.*')" wire:navigate>
+                    Assistant
+                </flux:navbar.item>
                 @can('viewAny', App\Models\Team::class)
                     <flux:navbar.item icon="users" href="{{ route('organisation.teams.index') }}" :current="request()->routeIs('organisation.teams.*')" wire:navigate>
                         Teams
@@ -122,6 +125,9 @@
                     </flux:navlist.item>
                     <flux:navlist.item icon="chat-bubble-left-right" href="{{ route('communications.index') }}" :current="request()->routeIs('communications.*')" wire:navigate>
                         Communications
+                    </flux:navlist.item>
+                    <flux:navlist.item icon="sparkles" href="{{ route('assistant.show') }}" :current="request()->routeIs('assistant.*')" wire:navigate>
+                        Assistant
                     </flux:navlist.item>
                     @can('viewAny', App\Models\Team::class)
                         <flux:navlist.item icon="users" href="{{ route('organisation.teams.index') }}" :current="request()->routeIs('organisation.teams.*')" wire:navigate>

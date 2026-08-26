@@ -35,8 +35,8 @@
                     <p class="text-xs text-zinc-500 dark:text-zinc-400">If you select a template, its own subject/body are sent instead of anything typed below — @{{first_name}}, @{{company_name}}, @{{salesperson_name}} are substituted automatically. Leave "None" selected to write a custom message.</p>
                 @endif
 
-                <flux:input name="subject" label="Subject (ignored if a template is selected)" value="{{ old('subject') }}" />
-                <flux:textarea name="body" label="Message (ignored if a template is selected)" rows="8">{{ old('body') }}</flux:textarea>
+                <flux:input name="subject" label="Subject (ignored if a template is selected)" value="{{ old('subject', $context['subject']) }}" />
+                <flux:textarea name="body" label="Message (ignored if a template is selected)" rows="8">{{ old('body', $context['body']) }}</flux:textarea>
 
                 <flux:checkbox name="confirm" value="1" required :checked="old('confirm')" label="I confirm I want to send this message now. This action cannot be undone." />
 

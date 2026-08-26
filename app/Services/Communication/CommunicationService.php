@@ -148,6 +148,27 @@ class CommunicationService
         return $communication;
     }
 
+    /**
+     * Public entry point reused by Phase 7's draft_email/draft_whatsapp
+     * agent tools, so a drafted message is rendered through the exact
+     * same template-resolution and variable-substitution logic a real
+     * send would use — never a second, parallel implementation.
+     *
+     * @return array{subject: ?string, body: string}
+     *
+     * @throws ValidationException
+     */
+    public function previewTemplate(User $actor, int $templateId, CommunicationChannel $channel, ?int $organizationId, ?int $contactId, ?int $leadId, ?int $opportunityId): array
+    {
+        $template = $this->resolveTemplate($actor, $templateId, $channel);
+        $variables = $this->resolveTemplateVariables($actor, $organizationId, $contactId, $leadId, $opportunityId);
+
+        return [
+            'subject' => $template->subject !== null ? $this->templates->render($template->subject, $variables) : null,
+            'body' => $this->templates->render($template->body, $variables),
+        ];
+    }
+
     private function resolveTemplate(User $actor, ?int $templateId, CommunicationChannel $channel): ?MessageTemplate
     {
         if ($templateId === null) {

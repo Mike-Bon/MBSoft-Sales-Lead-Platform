@@ -18,7 +18,7 @@
 
                 <flux:select name="whatsapp_number_id" label="Send from" required>
                     @foreach ($numbers as $number)
-                        <flux:select.option value="{{ $number->id }}" :selected="(string) old('whatsapp_number_id') === (string) $number->id">{{ $number->display_name }} ({{ $number->phone_number }})</flux:select.option>
+                        <flux:select.option value="{{ $number->id }}" :selected="(string) old('whatsapp_number_id', request()->query('whatsapp_number_id')) === (string) $number->id">{{ $number->display_name }} ({{ $number->phone_number }})</flux:select.option>
                     @endforeach
                 </flux:select>
 
@@ -33,7 +33,7 @@
                     <p class="text-xs text-zinc-500 dark:text-zinc-400">If you select a template, its own body is sent instead of anything typed below.</p>
                 @endif
 
-                <flux:textarea name="body" label="Message (ignored if a template is selected)" rows="6">{{ old('body') }}</flux:textarea>
+                <flux:textarea name="body" label="Message (ignored if a template is selected)" rows="6">{{ old('body', $context['body']) }}</flux:textarea>
 
                 <flux:callout variant="secondary" icon="information-circle">
                     <flux:callout.text>WhatsApp only allows free-form text to a recipient who has messaged this number within the last 24 hours. Outside that window, only a pre-approved template message will be delivered.</flux:callout.text>

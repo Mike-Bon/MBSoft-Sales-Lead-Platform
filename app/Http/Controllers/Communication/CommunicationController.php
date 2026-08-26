@@ -121,7 +121,7 @@ class CommunicationController extends Controller
     }
 
     /**
-     * @return array{organization_id: ?int, contact_id: ?int, lead_id: ?int, opportunity_id: ?int, recipient: ?string}
+     * @return array{organization_id: ?int, contact_id: ?int, lead_id: ?int, opportunity_id: ?int, recipient: ?string, recipient_phone: ?string, subject: ?string, body: ?string}
      */
     private function resolveContext(Request $request): array
     {
@@ -142,8 +142,16 @@ class CommunicationController extends Controller
             'contact_id' => $contact?->id,
             'lead_id' => $leadId ? (int) $leadId : null,
             'opportunity_id' => $opportunityId ? (int) $opportunityId : null,
-            'recipient' => $contact?->email,
-            'recipient_phone' => $contact?->mobile ?? $contact?->phone,
+            // A prefilled recipient/subject/body (e.g. from the AI
+            // assistant's draft_email/draft_whatsapp tool — see
+            // resources/views/assistant/show.blade.php) always takes
+            // priority over a contact-derived default: the human is
+            // reviewing that specific drafted content, not a fresh
+            // blank composer.
+            'recipient' => $request->query('recipient', $contact?->email),
+            'recipient_phone' => $request->query('recipient', $contact?->mobile ?? $contact?->phone),
+            'subject' => $request->query('subject'),
+            'body' => $request->query('body'),
         ];
     }
 }
