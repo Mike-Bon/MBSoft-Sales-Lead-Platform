@@ -5,6 +5,8 @@
 
         <x-performance.period-selector :period="$period" />
 
+        <x-ai.insights-card :insights="$aiInsights" />
+
         @include('performance.teams._detail')
     </div>
 </x-layouts.app>

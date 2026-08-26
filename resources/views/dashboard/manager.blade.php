@@ -30,6 +30,8 @@
 
         <x-performance.period-selector :period="$period" />
 
+        <x-ai.insights-card :insights="$aiInsights" />
+
         {{-- A. Organisation performance --}}
         <flux:heading size="lg" class="mb-2">Organisation Performance</flux:heading>
         <div class="mb-4">

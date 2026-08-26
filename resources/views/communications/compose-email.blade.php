@@ -18,6 +18,12 @@
                 <input type="hidden" name="contact_id" value="{{ old('contact_id', $context['contact_id']) }}" />
                 <input type="hidden" name="lead_id" value="{{ old('lead_id', $context['lead_id']) }}" />
                 <input type="hidden" name="opportunity_id" value="{{ old('opportunity_id', $context['opportunity_id']) }}" />
+                @if ($context['workflow_approval_id'] ?? null)
+                    <input type="hidden" name="workflow_approval_id" value="{{ $context['workflow_approval_id'] }}" />
+                    <flux:callout variant="secondary" icon="sparkles">
+                        <flux:callout.text>This message was proposed by an AI workflow. Review it carefully before sending — sending it here will mark that proposal approved.</flux:callout.text>
+                    </flux:callout>
+                @endif
 
                 <div class="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-700">
                     <span class="text-zinc-500 dark:text-zinc-400">Sending from:</span>

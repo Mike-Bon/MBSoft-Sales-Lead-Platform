@@ -116,4 +116,15 @@ class Communication extends Model
     {
         return $this->hasOne(Activity::class);
     }
+
+    /**
+     * The Phase 8 WorkflowApproval this communication was sent under, if
+     * it originated from a workflow's proposed draft rather than a
+     * manual compose (Phase 6) or the assistant's draft handoff (Phase
+     * 7) — both of which leave this null.
+     */
+    public function workflowApproval(): BelongsTo
+    {
+        return $this->belongsTo(WorkflowApproval::class);
+    }
 }

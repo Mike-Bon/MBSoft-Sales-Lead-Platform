@@ -76,4 +76,30 @@ return [
         'history_turns' => env('AI_HISTORY_TURNS', 6),
     ],
 
+    // ── Phase 8: controlled agentic workflows ────────────────────────
+    // STEP 30: the minimum configuration required — enable/disable per
+    // workflow and the daily run time. No user-facing workflow builder;
+    // these are the only three workflows and they are not
+    // user-editable. See docs/WORKFLOWS.md.
+    'workflows' => [
+        'daily_follow_up_review' => [
+            'enabled' => env('WORKFLOW_DAILY_FOLLOW_UP_REVIEW_ENABLED', true),
+        ],
+        'opportunity_attention_review' => [
+            'enabled' => env('WORKFLOW_OPPORTUNITY_ATTENTION_REVIEW_ENABLED', true),
+        ],
+        'performance_exception_review' => [
+            'enabled' => env('WORKFLOW_PERFORMANCE_EXCEPTION_REVIEW_ENABLED', true),
+        ],
+        // 24-hour "HH:MM" the daily scheduled run fires at.
+        'run_at' => env('WORKFLOW_RUN_AT', '08:00'),
+        // How many days a workflow-produced approval remains actionable
+        // before it's treated as expired (STEP 39).
+        'approval_ttl_days' => env('WORKFLOW_APPROVAL_TTL_DAYS', 3),
+        // Deterministic thresholds (STEP 37) — plain Laravel business
+        // rules, never left to the model to decide.
+        'stalled_opportunity_days' => env('WORKFLOW_STALLED_OPPORTUNITY_DAYS', 14),
+        'closing_soon_days' => env('WORKFLOW_CLOSING_SOON_DAYS', 7),
+    ],
+
 ];

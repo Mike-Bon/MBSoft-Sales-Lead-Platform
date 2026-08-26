@@ -32,6 +32,8 @@ class SendWhatsAppRequest extends FormRequest
             'contact_id' => ['nullable', 'integer', 'exists:contacts,id'],
             'lead_id' => ['nullable', 'integer', 'exists:leads,id'],
             'opportunity_id' => ['nullable', 'integer', 'exists:opportunities,id'],
+            // Phase 8: see SendEmailRequest's docblock.
+            'workflow_approval_id' => ['nullable', 'integer', 'exists:workflow_approvals,id'],
             'confirm' => ['accepted'],
         ];
     }

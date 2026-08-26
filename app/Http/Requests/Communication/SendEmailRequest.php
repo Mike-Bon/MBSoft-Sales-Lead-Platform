@@ -32,6 +32,12 @@ class SendEmailRequest extends FormRequest
             'contact_id' => ['nullable', 'integer', 'exists:contacts,id'],
             'lead_id' => ['nullable', 'integer', 'exists:leads,id'],
             'opportunity_id' => ['nullable', 'integer', 'exists:opportunities,id'],
+            // Phase 8: present only when this send originated from a
+            // workflow-produced approval's "Review & Send" link —
+            // CommunicationService re-validates it belongs to the actor
+            // and is still pending/unexpired before ever sending
+            // (STEP 40).
+            'workflow_approval_id' => ['nullable', 'integer', 'exists:workflow_approvals,id'],
             'confirm' => ['accepted'],
         ];
     }

@@ -6,6 +6,7 @@ use App\Models\Team;
 use App\Services\Dashboard\IndividualDashboardService;
 use App\Services\Dashboard\ManagerDashboardService;
 use App\Services\Dashboard\TeamDashboardService;
+use App\Services\Workflow\AiInsightsSummaryService;
 use App\Support\PerformanceSnapshot;
 use App\Support\PeriodSelection;
 use Illuminate\Contracts\View\View;
@@ -22,6 +23,10 @@ use Illuminate\Support\Collection;
  * already-computed payload. The only thing this controller does beyond
  * that is reorder the Manager's already-computed team list for display
  * (STEP 3.B "sort teams") — reordering is not a calculation.
+ *
+ * `aiInsights` (Phase 8, STEP 53/54/55) is added the same additive way:
+ * a small, already-scoped-to-this-user read, never a redesign of the
+ * dashboard.
  */
 class DashboardController extends Controller
 {
@@ -31,18 +36,20 @@ class DashboardController extends Controller
         private readonly ManagerDashboardService $managerDashboard,
         private readonly TeamDashboardService $teamDashboard,
         private readonly IndividualDashboardService $individualDashboard,
+        private readonly AiInsightsSummaryService $aiInsights,
     ) {}
 
     public function index(Request $request): View
     {
         $user = $request->user();
         $period = PeriodSelection::fromRequest($request);
+        $aiInsights = $this->aiInsights->forUser($user);
 
         if ($user->isManager()) {
             $data = $this->managerDashboard->build($period->start, $period->end);
             $data['teams'] = $this->sortTeams($data['teams'], $request);
 
-            return view('dashboard.manager', ['period' => $period, ...$data]);
+            return view('dashboard.manager', ['period' => $period, 'aiInsights' => $aiInsights, ...$data]);
         }
 
         $team = $user->team_id ? Team::find($user->team_id) : null;
@@ -54,6 +61,7 @@ class DashboardController extends Controller
 
             return view('dashboard.team-head', [
                 'period' => $period,
+                'aiInsights' => $aiInsights,
                 ...$this->teamDashboard->build($team, $period->start, $period->end),
             ]);
         }
@@ -62,6 +70,7 @@ class DashboardController extends Controller
         return view('dashboard.team-member', [
             'period' => $period,
             'team' => $team,
+            'aiInsights' => $aiInsights,
             ...$this->individualDashboard->build($user, $period->start, $period->end),
         ]);
     }

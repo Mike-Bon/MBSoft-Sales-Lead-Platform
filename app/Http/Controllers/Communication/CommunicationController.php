@@ -16,6 +16,7 @@ use App\Models\MessageTemplate;
 use App\Models\Opportunity;
 use App\Models\Organization;
 use App\Models\WhatsAppBusinessNumber;
+use App\Models\WorkflowApproval;
 use App\Services\Communication\CommunicationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -130,6 +131,20 @@ class CommunicationController extends Controller
         $opportunityId = $request->query('opportunity_id');
         $organizationId = $request->query('organization_id');
 
+        // Phase 8: a workflow-produced approval is the single source of
+        // truth for prefill when present — its own CRM references take
+        // priority over any other query param, so the composer can
+        // never show a mismatched combination of "approval X's body"
+        // and "a different record's contact/organization".
+        $approval = $this->resolveApprovalForPrefill($request);
+
+        if ($approval) {
+            $contactId = $approval->contact_id ?? $contactId;
+            $leadId = $approval->lead_id ?? $leadId;
+            $opportunityId = $approval->opportunity_id ?? $opportunityId;
+            $organizationId = $approval->organization_id ?? $organizationId;
+        }
+
         $contact = $contactId ? Contact::find($contactId) : null;
         $contact ??= $leadId ? Lead::find($leadId)?->contact : null;
         $contact ??= $opportunityId ? Opportunity::find($opportunityId)?->contact : null;
@@ -143,15 +158,41 @@ class CommunicationController extends Controller
             'lead_id' => $leadId ? (int) $leadId : null,
             'opportunity_id' => $opportunityId ? (int) $opportunityId : null,
             // A prefilled recipient/subject/body (e.g. from the AI
-            // assistant's draft_email/draft_whatsapp tool — see
-            // resources/views/assistant/show.blade.php) always takes
-            // priority over a contact-derived default: the human is
-            // reviewing that specific drafted content, not a fresh
-            // blank composer.
-            'recipient' => $request->query('recipient', $contact?->email),
-            'recipient_phone' => $request->query('recipient', $contact?->mobile ?? $contact?->phone),
-            'subject' => $request->query('subject'),
-            'body' => $request->query('body'),
+            // assistant's draft_email/draft_whatsapp tool, or a Phase 8
+            // workflow approval) always takes priority over a
+            // contact-derived default: the human is reviewing that
+            // specific drafted content, not a fresh blank composer.
+            'recipient' => $approval?->recipient ?? $request->query('recipient', $contact?->email),
+            'recipient_phone' => $approval?->recipient ?? $request->query('recipient', $contact?->mobile ?? $contact?->phone),
+            'subject' => $approval?->subject ?? $request->query('subject'),
+            'body' => $approval?->body ?? $request->query('body'),
+            'workflow_approval_id' => $approval?->id,
+            'whatsapp_number_id' => $approval?->whatsapp_number_id,
         ];
+    }
+
+    /**
+     * Only ever returns an approval the authenticated user actually owns
+     * and can still act on — a guessed/foreign/stale id is treated
+     * exactly as if none was supplied, never exposed here even to
+     * prefill a form (the real enforcement is
+     * CommunicationService::resolveWorkflowApproval at send time; this
+     * is defense in depth against confusing/leaking prefill data).
+     */
+    private function resolveApprovalForPrefill(Request $request): ?WorkflowApproval
+    {
+        $id = $request->query('workflow_approval_id');
+
+        if (! $id) {
+            return null;
+        }
+
+        $approval = WorkflowApproval::find($id);
+
+        if (! $approval || $approval->user_id !== $request->user()->id || ! $approval->isActionable()) {
+            return null;
+        }
+
+        return $approval;
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services\Communication;
 
 use App\Enums\ActivityType;
+use App\Enums\ApprovalStatus;
 use App\Enums\CommunicationChannel;
 use App\Enums\CommunicationDirection;
 use App\Enums\CommunicationStatus;
@@ -15,6 +16,7 @@ use App\Models\Opportunity;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\WhatsAppBusinessNumber;
+use App\Models\WorkflowApproval;
 use App\Services\ActivityLogger;
 use App\Support\Communication\TemplateRenderer;
 use Illuminate\Support\Str;
@@ -48,7 +50,7 @@ class CommunicationService
     ) {}
 
     /**
-     * @param  array{recipient: string, subject?: ?string, body?: ?string, template_id?: ?int, organization_id?: ?int, contact_id?: ?int, lead_id?: ?int, opportunity_id?: ?int}  $data
+     * @param  array{recipient: string, subject?: ?string, body?: ?string, template_id?: ?int, organization_id?: ?int, contact_id?: ?int, lead_id?: ?int, opportunity_id?: ?int, workflow_approval_id?: ?int}  $data
      */
     public function sendEmail(User $actor, array $data): Communication
     {
@@ -69,6 +71,11 @@ class CommunicationService
             $data['opportunity_id'] ?? null,
         );
 
+        // STEP 40: revalidated BEFORE any side effect — a stale/expired/
+        // foreign/already-decided approval blocks the send entirely
+        // rather than silently sending unlinked.
+        $approval = $this->resolveWorkflowApproval($actor, $data['workflow_approval_id'] ?? null);
+
         $template = $this->resolveTemplate($actor, $data['template_id'] ?? null, CommunicationChannel::Email);
         [$subject, $body] = $this->resolveContent($actor, $data, $template);
 
@@ -85,11 +92,16 @@ class CommunicationService
         $communication->contact_id = $data['contact_id'] ?? null;
         $communication->lead_id = $data['lead_id'] ?? null;
         $communication->opportunity_id = $data['opportunity_id'] ?? null;
+        $communication->workflow_approval_id = $approval?->id;
         $communication->subject = $subject;
         $communication->recipient = $data['recipient'];
         $communication->sender = $account->email_address;
         $communication->body = $body;
         $communication->save();
+
+        if ($approval) {
+            $this->markApprovalApproved($approval, $actor);
+        }
 
         $this->logActivity($actor, ActivityType::Email, $communication, $subject);
 
@@ -99,7 +111,7 @@ class CommunicationService
     }
 
     /**
-     * @param  array{recipient: string, body?: ?string, template_id?: ?int, whatsapp_number_id: int, organization_id?: ?int, contact_id?: ?int, lead_id?: ?int, opportunity_id?: ?int}  $data
+     * @param  array{recipient: string, body?: ?string, template_id?: ?int, whatsapp_number_id: int, organization_id?: ?int, contact_id?: ?int, lead_id?: ?int, opportunity_id?: ?int, workflow_approval_id?: ?int}  $data
      */
     public function sendWhatsApp(User $actor, array $data): Communication
     {
@@ -120,6 +132,8 @@ class CommunicationService
             $data['opportunity_id'] ?? null,
         );
 
+        $approval = $this->resolveWorkflowApproval($actor, $data['workflow_approval_id'] ?? null);
+
         $template = $this->resolveTemplate($actor, $data['template_id'] ?? null, CommunicationChannel::WhatsApp);
         [, $body] = $this->resolveContent($actor, $data, $template);
 
@@ -136,16 +150,63 @@ class CommunicationService
         $communication->contact_id = $data['contact_id'] ?? null;
         $communication->lead_id = $data['lead_id'] ?? null;
         $communication->opportunity_id = $data['opportunity_id'] ?? null;
+        $communication->workflow_approval_id = $approval?->id;
         $communication->recipient = $data['recipient'];
         $communication->sender = $number->phone_number;
         $communication->body = $body;
         $communication->save();
+
+        if ($approval) {
+            $this->markApprovalApproved($approval, $actor);
+        }
 
         $this->logActivity($actor, ActivityType::WhatsApp, $communication, Str::limit($body, 60));
 
         SendCommunicationJob::dispatch($communication->id);
 
         return $communication;
+    }
+
+    /**
+     * STEP 40 approval revalidation. Returns null when no approval was
+     * referenced (the ordinary, non-workflow send path) — throws when
+     * one WAS referenced but is no longer valid, rather than silently
+     * sending unlinked, since a stale reference here signals something
+     * worth stopping for (a race, a stale link, tampering).
+     *
+     * @throws ValidationException
+     */
+    private function resolveWorkflowApproval(User $actor, ?int $approvalId): ?WorkflowApproval
+    {
+        if ($approvalId === null) {
+            return null;
+        }
+
+        $approval = WorkflowApproval::find($approvalId);
+
+        if (! $approval || $approval->user_id !== $actor->id) {
+            throw ValidationException::withMessages([
+                'workflow_approval_id' => 'This approval could not be found.',
+            ]);
+        }
+
+        if (! $approval->isActionable()) {
+            throw ValidationException::withMessages([
+                'workflow_approval_id' => $approval->status === ApprovalStatus::Pending
+                    ? 'This approval has expired. Compose the message again if it is still needed.'
+                    : 'This approval has already been decided.',
+            ]);
+        }
+
+        return $approval;
+    }
+
+    private function markApprovalApproved(WorkflowApproval $approval, User $actor): void
+    {
+        $approval->status = ApprovalStatus::Approved;
+        $approval->decided_at = now();
+        $approval->decided_by = $actor->id;
+        $approval->save();
     }
 
     /**

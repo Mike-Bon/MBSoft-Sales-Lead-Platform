@@ -10,6 +10,8 @@
 
         <x-performance.period-selector :period="$period" />
 
+        <x-ai.insights-card :insights="$aiInsights" />
+
         <flux:heading size="lg" class="mb-2">My Performance</flux:heading>
         <div class="mb-4">
             <x-performance.kpi-row :snapshot="$snapshot" />
