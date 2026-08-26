@@ -32,6 +32,7 @@ class OpportunityService
             $opportunity = new Opportunity($data);
             $opportunity->owner_id = $assignment['owner_id'];
             $opportunity->team_id = $assignment['team_id'];
+            $this->applyClosedAt($opportunity, $data, wasClosed: false);
             $opportunity->save();
 
             $this->activities->log($actor, ActivityType::Note, [
@@ -65,6 +66,7 @@ class OpportunityService
             $opportunity->fill($data);
             $opportunity->owner_id = $assignment['owner_id'];
             $opportunity->team_id = $assignment['team_id'];
+            $this->applyClosedAt($opportunity, $data, wasClosed: $previousStage->isClosed());
             $opportunity->save();
 
             if ($previousStage !== $opportunity->stage) {
@@ -99,5 +101,36 @@ class OpportunityService
     public function archive(Opportunity $opportunity): void
     {
         $opportunity->delete();
+    }
+
+    /**
+     * Keeps closed_at consistent with stage, unless the caller explicitly
+     * supplied one (backdating a historical/imported deal).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function applyClosedAt(Opportunity $opportunity, array $data, bool $wasClosed): void
+    {
+        if (! empty($data['closed_at'])) {
+            // Explicit value supplied — respect it as-is (already applied
+            // by fill()/the constructor since closed_at is fillable).
+            return;
+        }
+
+        if (! $opportunity->stage->isClosed()) {
+            // Open (or just reopened): no meaningful close date.
+            $opportunity->closed_at = null;
+
+            return;
+        }
+
+        if (! $wasClosed || $opportunity->closed_at === null) {
+            // Freshly closed (including "created directly into a closed
+            // stage"): record the close as happening now.
+            $opportunity->closed_at = now();
+        }
+
+        // Else: already closed and stays closed (e.g. editing an
+        // unrelated field) — leave the existing closed_at untouched.
     }
 }

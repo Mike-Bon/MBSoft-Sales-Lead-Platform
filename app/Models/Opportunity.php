@@ -39,6 +39,7 @@ class Opportunity extends Model
         'currency',
         'probability',
         'expected_close_date',
+        'closed_at',
         'description',
         'notes',
     ];
@@ -53,6 +54,7 @@ class Opportunity extends Model
             'value' => 'decimal:2',
             'probability' => 'integer',
             'expected_close_date' => 'date',
+            'closed_at' => 'datetime',
         ];
     }
 

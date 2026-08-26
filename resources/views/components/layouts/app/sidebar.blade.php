@@ -20,6 +20,8 @@
                     <flux:navlist.item icon="funnel" :href="route('crm.leads.index')" :current="request()->routeIs('crm.leads.*')" wire:navigate>Leads</flux:navlist.item>
                     <flux:navlist.item icon="currency-dollar" :href="route('crm.opportunities.index')" :current="request()->routeIs('crm.opportunities.*')" wire:navigate>Opportunities</flux:navlist.item>
                     <flux:navlist.item icon="clock" :href="route('crm.activities.index')" :current="request()->routeIs('crm.activities.*')" wire:navigate>Activities</flux:navlist.item>
+                    <flux:navlist.item icon="flag" :href="route('performance.targets.index')" :current="request()->routeIs('performance.targets.*')" wire:navigate>Targets</flux:navlist.item>
+                    <flux:navlist.item icon="chart-bar" :href="route('performance.index')" :current="request()->routeIs('performance.index')" wire:navigate>Performance</flux:navlist.item>
                     @can('viewAny', App\Models\Team::class)
                         <flux:navlist.item icon="users" :href="route('organisation.teams.index')" :current="request()->routeIs('organisation.teams.*')" wire:navigate>Teams</flux:navlist.item>
                     @endcan

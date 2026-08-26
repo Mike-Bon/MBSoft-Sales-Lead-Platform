@@ -40,6 +40,16 @@
     <flux:input name="expected_close_date" label="Expected close date" type="date" value="{{ old('expected_close_date', optional($o?->expected_close_date)->format('Y-m-d')) }}" />
 </div>
 
+@if ($o)
+    <flux:input
+        name="closed_at"
+        label="Actual close date"
+        type="date"
+        value="{{ old('closed_at', optional($o->closed_at)->format('Y-m-d')) }}"
+        description="Set automatically when the stage becomes Closed Won/Closed Lost. Only change this to backdate a historical or imported deal — this is the date used for target/performance calculations."
+    />
+@endif
+
 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
     <flux:select name="team_id" label="Team" placeholder="Organisation-wide (no team)">
         @foreach ($teams as $team)

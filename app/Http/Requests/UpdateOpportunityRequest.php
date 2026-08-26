@@ -32,6 +32,7 @@ class UpdateOpportunityRequest extends FormRequest
             'currency' => ['nullable', 'string', 'size:3'],
             'probability' => ['nullable', 'integer', 'min:0', 'max:100'],
             'expected_close_date' => ['nullable', 'date'],
+            'closed_at' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'owner_id' => ['nullable', 'integer', 'exists:users,id'],

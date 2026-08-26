@@ -181,6 +181,13 @@ class CrmSeeder extends Seeder
                 'owner_id' => $head2->id, 'team_id' => $team2->id,
                 'stage' => OpportunityStage::ClosedWon, 'value' => 31000, 'currency' => 'USD', 'probability' => 100,
                 'expected_close_date' => now()->subDays(5),
+                // Set explicitly: this opportunity is created directly
+                // into a closed stage (not via OpportunityService, which
+                // would set this automatically on a real stage
+                // transition) — see docs/PERFORMANCE.md on why closed_at,
+                // not expected_close_date, is what actual-sales
+                // calculations key off.
+                'closed_at' => now()->subDays(5),
             ],
         );
 
@@ -191,6 +198,7 @@ class CrmSeeder extends Seeder
                 'owner_id' => $member2->id, 'team_id' => $team2->id,
                 'stage' => OpportunityStage::ClosedLost, 'value' => 6000, 'currency' => 'USD', 'probability' => 0,
                 'expected_close_date' => now()->subDays(2),
+                'closed_at' => now()->subDays(2),
             ],
         );
 
