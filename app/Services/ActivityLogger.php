@@ -18,7 +18,7 @@ use App\Models\User;
 class ActivityLogger
 {
     /**
-     * @param  array{organization_id?: ?int, contact_id?: ?int, lead_id?: ?int, opportunity_id?: ?int, subject?: ?string, description?: ?string, occurred_at?: \DateTimeInterface|string|null}  $attributes
+     * @param  array{organization_id?: ?int, contact_id?: ?int, lead_id?: ?int, opportunity_id?: ?int, subject?: ?string, description?: ?string, occurred_at?: \DateTimeInterface|string|null, communication_id?: ?int}  $attributes
      */
     public function log(User $actor, ActivityType $type, array $attributes = []): Activity
     {
@@ -39,6 +39,11 @@ class ActivityLogger
 
         $activity->user_id = $actor->id;
         $activity->team_id = $actor->team_id;
+
+        // Set (Phase 6) when this activity represents a Communication —
+        // see Activity::communication() / communications.md.
+        $activity->communication_id = $attributes['communication_id'] ?? null;
+
         $activity->save();
 
         return $activity;

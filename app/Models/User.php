@@ -87,6 +87,15 @@ class User extends Authenticatable // implements MustVerifyEmail
         return $this->hasOne(Team::class, 'team_head_id');
     }
 
+    /**
+     * This user's own connected Gmail account, if any (STEP 7: one
+     * per-user connection, never a shared organisation mailbox).
+     */
+    public function emailAccount(): HasOne
+    {
+        return $this->hasOne(EmailAccount::class);
+    }
+
     public function isManager(): bool
     {
         return $this->role === UserRole::Manager;

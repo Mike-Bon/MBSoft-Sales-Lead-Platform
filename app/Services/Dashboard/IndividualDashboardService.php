@@ -4,6 +4,7 @@ namespace App\Services\Dashboard;
 
 use App\Enums\LeadStatus;
 use App\Enums\OpportunityStage;
+use App\Models\Communication;
 use App\Models\Lead;
 use App\Models\Opportunity;
 use App\Models\User;
@@ -16,13 +17,15 @@ use Illuminate\Support\Carbon;
  * pipeline, their own open leads and opportunities, and their own
  * follow-ups. No organisation- or team-wide data is ever queried here —
  * the scope is enforced by every query below filtering to exactly
- * $user->id, not by hiding anything on the frontend.
+ * $user->id, not by hiding anything on the frontend. communicationMetrics
+ * (Phase 6, STEP 26) is scoped the same way.
  */
 class IndividualDashboardService
 {
     public function __construct(
         private readonly PerformanceService $performance,
         private readonly CrmMetricsService $metrics,
+        private readonly CommunicationMetricsService $communicationMetrics,
     ) {}
 
     /**
@@ -32,6 +35,7 @@ class IndividualDashboardService
     {
         $leads = Lead::query()->where('leads.owner_id', $user->id);
         $opportunities = Opportunity::query()->where('opportunities.owner_id', $user->id);
+        $communications = Communication::query()->where('communications.user_id', $user->id);
 
         return [
             'user' => $user,
@@ -46,6 +50,7 @@ class IndividualDashboardService
                 OpportunityStage::ClosedLost->value,
             ])->count(),
             'followUpCounts' => $this->metrics->followUpCounts($leads),
+            'communicationMetrics' => $this->communicationMetrics->summary($communications, $periodStart, $periodEnd),
             'overdueLeads' => $this->metrics->overdueLeads($leads),
             'upcomingLeads' => (clone $leads)
                 ->with(['organization', 'contact'])

@@ -24,3 +24,4 @@ require __DIR__.'/auth.php';
 require __DIR__.'/organisation.php';
 require __DIR__.'/crm.php';
 require __DIR__.'/performance.php';
+require __DIR__.'/communications.php';

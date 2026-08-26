@@ -100,7 +100,11 @@ class LeadController extends Controller
 
         $lead->load(['organization', 'contact', 'owner', 'team', 'opportunities.owner']);
 
-        $timeline = $lead->activities()->with('user')->orderByDesc('occurred_at')->get();
+        // 'communication' is eager-loaded so the timeline (STEP 15 of
+        // Phase 6) can show a distinguishing badge/link for activities
+        // that represent an actual sent/received message, without an
+        // extra query per row.
+        $timeline = $lead->activities()->with(['user', 'communication'])->orderByDesc('occurred_at')->get();
 
         return view('crm.leads.show', [
             'lead' => $lead,

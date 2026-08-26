@@ -19,6 +19,10 @@
                 </flux:subheading>
             </div>
             <div class="flex gap-2">
+                @can('create', \App\Models\Communication::class)
+                    <flux:button href="{{ route('communications.compose-email', ['lead_id' => $lead->id]) }}" wire:navigate>Send Email</flux:button>
+                    <flux:button href="{{ route('communications.compose-whatsapp', ['lead_id' => $lead->id]) }}" wire:navigate>Send WhatsApp</flux:button>
+                @endcan
                 @can('update', $lead)
                     <flux:button href="{{ route('crm.leads.edit', $lead) }}" wire:navigate>Edit</flux:button>
                 @endcan
@@ -140,7 +144,14 @@
             @forelse ($timeline as $activity)
                 <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                     <div class="flex items-center justify-between">
-                        <flux:badge size="sm">{{ $activity->type->label() }}</flux:badge>
+                        <div class="flex items-center gap-2">
+                            <flux:badge size="sm">{{ $activity->type->label() }}</flux:badge>
+                            @if ($activity->communication)
+                                <flux:badge size="sm" color="blue" href="{{ route('communications.show', $activity->communication) }}" wire:navigate>
+                                    {{ $activity->communication->status->label() }}
+                                </flux:badge>
+                            @endif
+                        </div>
                         <span class="text-xs text-zinc-500 dark:text-zinc-400">{{ $activity->occurred_at->format('M j, Y g:i A') }} &middot; {{ $activity->user?->name ?? 'System' }}</span>
                     </div>
                     @if ($activity->subject)

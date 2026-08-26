@@ -3,6 +3,7 @@
 namespace App\Services\Dashboard;
 
 use App\Enums\UserRole;
+use App\Models\Communication;
 use App\Models\Lead;
 use App\Models\Opportunity;
 use App\Models\Team;
@@ -14,6 +15,7 @@ use Illuminate\Support\Carbon;
  * individual member performance, team pipeline, team leads, and
  * follow-ups — all scoped to exactly one team, and all sourced from
  * PerformanceService/CrmMetricsService, never recalculated here.
+ * communicationMetrics (Phase 6, STEP 26) is scoped to the same team.
  *
  * Also used for App\Http\Controllers\Performance\TeamPerformanceController
  * (STEP 14's /teams/{team}/performance drill-down), which needs the same
@@ -24,6 +26,7 @@ class TeamDashboardService
     public function __construct(
         private readonly PerformanceService $performance,
         private readonly CrmMetricsService $metrics,
+        private readonly CommunicationMetricsService $communicationMetrics,
     ) {}
 
     /**
@@ -45,6 +48,7 @@ class TeamDashboardService
         // here would become ambiguous once that join is added.
         $leads = Lead::query()->where('leads.team_id', $team->id);
         $opportunities = Opportunity::query()->where('opportunities.team_id', $team->id);
+        $communications = Communication::query()->where('communications.team_id', $team->id);
 
         return [
             'team' => $team,
@@ -54,6 +58,7 @@ class TeamDashboardService
             'pipelineByStage' => $this->metrics->pipelineByStage($opportunities),
             'pipelineByOwner' => $this->metrics->pipelineByOwner($opportunities),
             'followUpCounts' => $this->metrics->followUpCounts($leads),
+            'communicationMetrics' => $this->communicationMetrics->summary($communications, $periodStart, $periodEnd),
             'attention' => [
                 'overdueLeads' => $this->metrics->overdueLeads($leads),
                 'highPriorityLeads' => $this->metrics->highPriorityLeads($leads),

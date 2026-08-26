@@ -83,7 +83,8 @@ class OpportunityController extends Controller
 
         $opportunity->load(['organization', 'contact', 'lead', 'owner', 'team']);
 
-        $timeline = $opportunity->activities()->with('user')->orderByDesc('occurred_at')->get();
+        // See LeadController::show for why 'communication' is eager-loaded.
+        $timeline = $opportunity->activities()->with(['user', 'communication'])->orderByDesc('occurred_at')->get();
 
         return view('crm.opportunities.show', ['opportunity' => $opportunity, 'timeline' => $timeline]);
     }

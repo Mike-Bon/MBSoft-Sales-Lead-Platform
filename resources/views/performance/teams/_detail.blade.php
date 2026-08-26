@@ -98,6 +98,17 @@
     <x-performance.kpi label="No Follow-up Set" :value="$followUpCounts['not_set']" />
 </div>
 
+@isset($communicationMetrics)
+    {{-- Phase 6, STEP 26 --}}
+    <flux:heading size="lg" class="mb-2">Communications</flux:heading>
+    <div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <x-performance.kpi label="Emails Sent" :value="$communicationMetrics['emails_sent']" />
+        <x-performance.kpi label="WhatsApp Sent" :value="$communicationMetrics['whatsapp_sent']" />
+        <x-performance.kpi label="Total Communications" :value="$communicationMetrics['total']" />
+        <x-performance.kpi label="Failed" :value="$communicationMetrics['failed']" />
+    </div>
+@endisset
+
 <flux:heading size="lg" class="mb-2">Needs Attention</flux:heading>
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
     <div>

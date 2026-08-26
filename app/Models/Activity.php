@@ -35,6 +35,10 @@ class Activity extends Model
         'occurred_at',
     ];
 
+    // `communication_id` is deliberately excluded above — an Activity is
+    // only ever linked to a Communication by CommunicationService when
+    // it records a sent/received message, never from request input.
+
     /**
      * @return array<string, string>
      */
@@ -74,5 +78,16 @@ class Activity extends Model
     public function opportunity(): BelongsTo
     {
         return $this->belongsTo(Opportunity::class);
+    }
+
+    /**
+     * The Communication this activity represents, if it represents one
+     * (STEP 15: communication events must be distinguishable from
+     * ordinary internal activities). Null for every activity type that
+     * predates Phase 6 and for manually-logged Call/Meeting/Note.
+     */
+    public function communication(): BelongsTo
+    {
+        return $this->belongsTo(Communication::class);
     }
 }

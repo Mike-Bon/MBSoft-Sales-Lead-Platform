@@ -5,6 +5,7 @@ namespace App\Services\Dashboard;
 use App\Enums\ManagementSignal;
 use App\Enums\TargetStatus;
 use App\Enums\TargetType;
+use App\Models\Communication;
 use App\Models\Lead;
 use App\Models\Opportunity;
 use App\Models\Target;
@@ -19,13 +20,15 @@ use Illuminate\Support\Carbon;
  * attention areas. Every number comes from PerformanceService
  * (target/actual/achievement/gap/pipeline/coverage) or CrmMetricsService
  * (counts/groupings) — this class only composes their results, it never
- * calculates a metric itself.
+ * calculates a metric itself. communicationMetrics (Phase 6, STEP 26) is
+ * an org-wide count summary, sourced the same way.
  */
 class ManagerDashboardService
 {
     public function __construct(
         private readonly PerformanceService $performance,
         private readonly CrmMetricsService $metrics,
+        private readonly CommunicationMetricsService $communicationMetrics,
     ) {}
 
     /**
@@ -42,6 +45,7 @@ class ManagerDashboardService
 
         $leads = Lead::query();
         $opportunities = Opportunity::query();
+        $communications = Communication::query();
 
         return [
             'organisation' => $organisation,
@@ -49,6 +53,7 @@ class ManagerDashboardService
             'leadStatusCounts' => $this->metrics->leadStatusCounts($leads),
             'pipelineByStage' => $this->metrics->pipelineByStage($opportunities),
             'followUpCounts' => $this->metrics->followUpCounts($leads),
+            'communicationMetrics' => $this->communicationMetrics->summary($communications, $periodStart, $periodEnd),
             'attention' => [
                 'overdueLeads' => $this->metrics->overdueLeads($leads),
                 'highPriorityLeads' => $this->metrics->highPriorityLeads($leads),
