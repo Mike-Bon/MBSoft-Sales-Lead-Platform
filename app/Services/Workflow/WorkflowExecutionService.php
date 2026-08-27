@@ -9,6 +9,7 @@ use App\Enums\WorkflowType;
 use App\Models\AgentInteraction;
 use App\Models\WorkflowApproval;
 use App\Models\WorkflowExecution;
+use App\Notifications\WorkflowApprovalPendingNotification;
 use App\Services\Ai\AssistantService;
 use App\Support\Workflow\AnalysisResult;
 use App\Support\Workflow\WorkflowScope;
@@ -142,6 +143,12 @@ class WorkflowExecutionService
             $approval->whatsapp_number_id = $draft['whatsapp_number_id'] ?? null;
             $approval->expires_at = now()->addDays((int) config('services.workflows.approval_ttl_days', 3));
             $approval->save();
+
+            // Phase 11: a database-only notification (no external I/O),
+            // so writing it inside this same transaction keeps the
+            // approval and its notification atomic — never one without
+            // the other.
+            $approval->user->notify(new WorkflowApprovalPendingNotification($approval));
 
             return $approval;
         });

@@ -46,7 +46,7 @@ class UserController extends Controller
         $data = $request->validated();
         $data['role'] = UserRole::from($data['role']);
 
-        $this->users->createUser($data);
+        $this->users->createUser($request->user(), $data);
 
         return redirect()->route('organisation.users.index')->with('status', 'User created.');
     }
@@ -67,7 +67,7 @@ class UserController extends Controller
         $data = $request->validated();
         $data['role'] = UserRole::from($data['role']);
 
-        $this->users->updateUserRoleAndTeam($user, $data);
+        $this->users->updateUserRoleAndTeam($request->user(), $user, $data);
 
         return redirect()->route('organisation.users.index')->with('status', 'User updated.');
     }

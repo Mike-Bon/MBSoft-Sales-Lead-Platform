@@ -45,6 +45,15 @@
             <flux:spacer />
 
             <flux:navbar class="mr-1.5 space-x-0.5 py-0!">
+                @php($unreadNotificationsCount = auth()->user()->unreadNotifications()->count())
+                <div class="relative">
+                    <flux:tooltip content="Notifications" position="bottom">
+                        <flux:navbar.item class="!h-10 [&>div>svg]:size-5" icon="bell" href="{{ route('notifications.index') }}" :current="request()->routeIs('notifications.*')" wire:navigate label="Notifications" />
+                    </flux:tooltip>
+                    @if ($unreadNotificationsCount > 0)
+                        <span class="absolute right-1 top-1 flex h-2 w-2 rounded-full bg-red-500" title="{{ $unreadNotificationsCount }} unread"></span>
+                    @endif
+                </div>
                 <flux:tooltip content="Search" position="bottom">
                     <flux:navbar.item class="!h-10 [&>div>svg]:size-5" icon="magnifying-glass" href="#" label="Search" />
                 </flux:tooltip>
@@ -140,6 +149,9 @@
                     </flux:navlist.item>
                     <flux:navlist.item icon="book-open" href="{{ route('knowledge.index') }}" :current="request()->routeIs('knowledge.*')" wire:navigate>
                         Knowledge
+                    </flux:navlist.item>
+                    <flux:navlist.item icon="bell" href="{{ route('notifications.index') }}" :current="request()->routeIs('notifications.*')" wire:navigate>
+                        Notifications{{ $unreadNotificationsCount > 0 ? " ({$unreadNotificationsCount})" : '' }}
                     </flux:navlist.item>
                     @can('viewAny', App\Models\Team::class)
                         <flux:navlist.item icon="users" href="{{ route('organisation.teams.index') }}" :current="request()->routeIs('organisation.teams.*')" wire:navigate>

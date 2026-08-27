@@ -8,6 +8,7 @@ use App\Enums\CommunicationChannel;
 use App\Enums\CommunicationFailureCode;
 use App\Enums\CommunicationStatus;
 use App\Models\Communication;
+use App\Notifications\CommunicationFailedNotification;
 use App\Support\Communication\ProviderSendResult;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -118,6 +119,11 @@ class SendCommunicationJob implements ShouldQueue
         $communication->failure_reason = $reason;
         $communication->failed_at = now();
         $communication->save();
+
+        // Phase 11: this job only ever handles outbound sends, so
+        // user_id (the sender) is always set here — the null-safe call
+        // is defensive only.
+        $communication->user?->notify(new CommunicationFailedNotification($communication));
     }
 
     /**

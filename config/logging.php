@@ -127,6 +127,22 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // Phase 11: security-relevant/sensitive-workflow events
+        // (role/team/leadership changes, per CLAUDE.md's "Security and
+        // privacy rules") — a separate stream from general application
+        // logs so it can carry its own, longer retention policy
+        // (see docs/OPERATIONS.md) without being pruned alongside
+        // routine debug/info noise. Written to via App\Support\AuditLogger
+        // only — never called directly, so every audit entry has a
+        // consistent shape.
+        'audit' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/audit.log'),
+            'level' => 'info',
+            'days' => env('LOG_AUDIT_RETENTION_DAYS', 365),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

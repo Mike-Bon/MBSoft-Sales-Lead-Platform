@@ -42,7 +42,7 @@ class TeamController extends Controller
 
     public function store(StoreTeamRequest $request): RedirectResponse
     {
-        $this->teams->createTeam($request->validated());
+        $this->teams->createTeam($request->user(), $request->validated());
 
         return redirect()->route('organisation.teams.index')->with('status', 'Team created.');
     }
@@ -87,7 +87,7 @@ class TeamController extends Controller
     {
         $newHead = User::findOrFail($request->validated('team_head_id'));
 
-        $this->teams->assignTeamHead($team, $newHead);
+        $this->teams->assignTeamHead($request->user(), $team, $newHead);
 
         return redirect()->route('organisation.teams.index')->with('status', 'Team Head assigned.');
     }

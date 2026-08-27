@@ -6,12 +6,16 @@ use App\Enums\TeamStatus;
 use App\Enums\UserRole;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\AuditLogger;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Owns every write to a team's identity and leadership. See
  * UserManagementService for the same rationale: one obvious place per
- * action for future audit logging to hook into.
+ * action for audit logging to hook into (Phase 11 STEP 3 closes it, for
+ * createTeam/assignTeamHead — updateTeam only ever touches name/code/
+ * status, which CLAUDE.md's audit list doesn't name, so it stays
+ * unlogged, consistent with the original, deliberate scoping here).
  *
  * Callers are responsible for authorization (TeamPolicy, enforced via the
  * controller/Form Request) before reaching this service.
@@ -21,17 +25,16 @@ class TeamManagementService
     /**
      * @param  array{name: string, code: ?string, status: ?TeamStatus}  $data
      */
-    public function createTeam(array $data): Team
+    public function createTeam(User $actor, array $data): Team
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($actor, $data) {
             $team = Team::create([
                 'name' => $data['name'],
                 'code' => $data['code'] ?? null,
                 'status' => $data['status'] ?? TeamStatus::Active,
             ]);
 
-            // Audit-log hook point: record actor, created team id, and
-            // timestamp once audit logging is introduced.
+            AuditLogger::record('team.created', $actor, ['team_id' => $team->id]);
 
             return $team;
         });
@@ -60,9 +63,9 @@ class TeamManagementService
      * orphaning the outgoing head. The Manager can subsequently reassign
      * them elsewhere via the normal user-management screen.
      */
-    public function assignTeamHead(Team $team, User $newHead): Team
+    public function assignTeamHead(User $actor, Team $team, User $newHead): Team
     {
-        return DB::transaction(function () use ($team, $newHead) {
+        return DB::transaction(function () use ($actor, $team, $newHead) {
             $previousHeadId = $team->team_head_id;
 
             if ($previousHeadId && $previousHeadId !== $newHead->id) {
@@ -81,8 +84,11 @@ class TeamManagementService
             $team->team_head_id = $newHead->id;
             $team->save();
 
-            // Audit-log hook point: record actor, team id, previous/new
-            // head user id, and timestamp once audit logging is introduced.
+            AuditLogger::record('team.head_assigned', $actor, [
+                'team_id' => $team->id,
+                'previous_head_id' => $previousHeadId,
+                'new_head_id' => $newHead->id,
+            ]);
 
             return $team->fresh();
         });
