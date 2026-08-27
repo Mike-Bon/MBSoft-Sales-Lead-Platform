@@ -27,3 +27,4 @@ require __DIR__.'/performance.php';
 require __DIR__.'/communications.php';
 require __DIR__.'/ai.php';
 require __DIR__.'/workflows.php';
+require __DIR__.'/knowledge.php';

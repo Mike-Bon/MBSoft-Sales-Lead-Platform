@@ -132,4 +132,42 @@ class AgentRegistryTest extends TestCase
         $this->assertSame([WorkflowType::OpportunityAttentionReview], $registry->get(AgentIdentifier::Sales)->allowedWorkflows);
         $this->assertSame([WorkflowType::PerformanceExceptionReview], $registry->get(AgentIdentifier::Performance)->allowedWorkflows);
     }
+
+    /**
+     * Phase 10 STEP 24: every agent gets its own search_knowledge
+     * instance — never no knowledge tool, and never every agent sharing
+     * one unrestricted instance.
+     */
+    public function test_every_agent_has_its_own_search_knowledge_tool(): void
+    {
+        $registry = app(AgentRegistry::class);
+
+        foreach (AgentIdentifier::cases() as $id) {
+            $this->assertNotNull($registry->get($id)->tools->find('search_knowledge'), "{$id->value} is missing search_knowledge.");
+        }
+    }
+
+    /**
+     * Phase 10 STEP 24/25: the knowledge-type permission matrix — each
+     * agent's search_knowledge only ever names its own allowed types.
+     */
+    public function test_each_agents_search_knowledge_tool_names_only_its_own_allowed_knowledge_types(): void
+    {
+        $registry = app(AgentRegistry::class);
+
+        $salesDescription = $registry->get(AgentIdentifier::Sales)->tools->find('search_knowledge')->definition()->description;
+        $this->assertStringContainsString('Sales Playbook', $salesDescription);
+        $this->assertStringContainsString('Product Guide', $salesDescription);
+        $this->assertStringNotContainsString('Training', $salesDescription);
+
+        $performanceDescription = $registry->get(AgentIdentifier::Performance)->tools->find('search_knowledge')->definition()->description;
+        $this->assertStringContainsString('Policy', $performanceDescription);
+        $this->assertStringContainsString('Training', $performanceDescription);
+        $this->assertStringNotContainsString('Sales Playbook', $performanceDescription);
+
+        $communicationDescription = $registry->get(AgentIdentifier::Communication)->tools->find('search_knowledge')->definition()->description;
+        $this->assertStringContainsString('FAQ', $communicationDescription);
+        $this->assertStringContainsString('Reference', $communicationDescription);
+        $this->assertStringNotContainsString('Product Guide', $communicationDescription);
+    }
 }

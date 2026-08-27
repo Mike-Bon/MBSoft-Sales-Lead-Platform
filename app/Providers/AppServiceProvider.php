@@ -6,6 +6,7 @@ use App\Contracts\Ai\LlmProvider;
 use App\Contracts\Communication\EmailProvider;
 use App\Contracts\Communication\WhatsAppProvider;
 use App\Enums\AgentIdentifier;
+use App\Enums\KnowledgeType;
 use App\Enums\WorkflowType;
 use App\Services\Ai\AgentRegistry;
 use App\Services\Ai\Prompts\CommunicationAgentPrompt;
@@ -22,10 +23,12 @@ use App\Services\Ai\Tools\GetMyPerformanceTool;
 use App\Services\Ai\Tools\GetOpportunityTool;
 use App\Services\Ai\Tools\GetPipelineSummaryTool;
 use App\Services\Ai\Tools\GetTeamPerformanceTool;
+use App\Services\Ai\Tools\SearchKnowledgeTool;
 use App\Services\Ai\Tools\SearchLeadsTool;
 use App\Services\Ai\Tools\SearchOpportunitiesTool;
 use App\Services\Communication\Providers\GmailEmailProvider;
 use App\Services\Communication\Providers\WhatsAppCloudApiProvider;
+use App\Services\Knowledge\KnowledgeSearchService;
 use App\Support\Ai\AgentDefinition;
 use Illuminate\Support\ServiceProvider;
 
@@ -72,6 +75,11 @@ class AppServiceProvider extends ServiceProvider
                         $app->make(GetFollowupsTool::class),
                         $app->make(GetCommunicationHistoryTool::class),
                         $app->make(GetPipelineSummaryTool::class),
+                        new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
+                            KnowledgeType::SalesPlaybook,
+                            KnowledgeType::ProductGuide,
+                            KnowledgeType::Sop,
+                        ]),
                     ]),
                     allowedWorkflows: [WorkflowType::OpportunityAttentionReview],
                     maxToolIterations: $maxIterations,
@@ -85,6 +93,10 @@ class AppServiceProvider extends ServiceProvider
                         $app->make(GetMyPerformanceTool::class),
                         $app->make(GetTeamPerformanceTool::class),
                         $app->make(GetPipelineSummaryTool::class),
+                        new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
+                            KnowledgeType::Policy,
+                            KnowledgeType::Training,
+                        ]),
                     ]),
                     allowedWorkflows: [WorkflowType::PerformanceExceptionReview],
                     maxToolIterations: $maxIterations,
@@ -101,6 +113,11 @@ class AppServiceProvider extends ServiceProvider
                         $app->make(GetOpportunityTool::class),
                         $app->make(DraftEmailTool::class),
                         $app->make(DraftWhatsAppTool::class),
+                        new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
+                            KnowledgeType::Faq,
+                            KnowledgeType::Reference,
+                            KnowledgeType::Sop,
+                        ]),
                     ]),
                     allowedWorkflows: [WorkflowType::DailyFollowUpReview],
                     maxToolIterations: $maxIterations,

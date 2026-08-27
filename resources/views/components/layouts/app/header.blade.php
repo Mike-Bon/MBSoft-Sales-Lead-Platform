@@ -27,6 +27,9 @@
                 <flux:navbar.item icon="clock" href="{{ route('workflows.index') }}" :current="request()->routeIs('workflows.*')" wire:navigate>
                     AI Activity
                 </flux:navbar.item>
+                <flux:navbar.item icon="book-open" href="{{ route('knowledge.index') }}" :current="request()->routeIs('knowledge.*')" wire:navigate>
+                    Knowledge
+                </flux:navbar.item>
                 @can('viewAny', App\Models\Team::class)
                     <flux:navbar.item icon="users" href="{{ route('organisation.teams.index') }}" :current="request()->routeIs('organisation.teams.*')" wire:navigate>
                         Teams
@@ -134,6 +137,9 @@
                     </flux:navlist.item>
                     <flux:navlist.item icon="clock" href="{{ route('workflows.index') }}" :current="request()->routeIs('workflows.*')" wire:navigate>
                         AI Activity
+                    </flux:navlist.item>
+                    <flux:navlist.item icon="book-open" href="{{ route('knowledge.index') }}" :current="request()->routeIs('knowledge.*')" wire:navigate>
+                        Knowledge
                     </flux:navlist.item>
                     @can('viewAny', App\Models\Team::class)
                         <flux:navlist.item icon="users" href="{{ route('organisation.teams.index') }}" :current="request()->routeIs('organisation.teams.*')" wire:navigate>
