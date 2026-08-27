@@ -29,14 +29,20 @@ class SendAssistantMessageRequest extends FormRequest
             'agent' => [
                 'nullable',
                 Rule::enum(AgentIdentifier::class),
-                // Phase 12: never trust the client to only offer an
+                // Phase 12/12A: never trust the client to only offer an
                 // eligible agent in the dropdown — re-checked here
-                // server-side regardless of what was actually submitted.
+                // server-side regardless of what was actually
+                // submitted. Deliberately generic wording: for
+                // Cost-to-Serve this can fail because of role OR
+                // because the global feature switch is off, and this
+                // message must not distinguish which (STEP 11: never
+                // reveal the switch's state to someone who isn't
+                // role-authorized anyway).
                 function (string $attribute, mixed $value, \Closure $fail) {
                     $agent = AgentIdentifier::tryFrom((string) $value);
 
                     if ($agent !== null && $this->user() !== null && ! $agent->isAvailableTo($this->user())) {
-                        $fail('That assistant is not available to your role.');
+                        $fail('That assistant is not currently available.');
                     }
                 },
             ],

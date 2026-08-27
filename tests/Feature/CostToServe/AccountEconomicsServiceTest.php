@@ -137,17 +137,23 @@ class AccountEconomicsServiceTest extends TestCase
         $this->assertSame($organization->id, $snapshot->organizationId);
     }
 
-    public function test_a_team_head_can_view_their_own_teams_organization(): void
+    /**
+     * Phase 12A: Team Head access was removed entirely — even for
+     * their own team's own organization, and even while the global
+     * feature switch is on. This is a deliberate policy change from
+     * Phase 12's original Manager-or-Team-Head scoping.
+     */
+    public function test_a_team_head_can_never_view_any_organization_even_their_own_team(): void
     {
         $team = Team::factory()->create();
         $head = User::factory()->teamHead($team)->create();
         $organization = Organization::factory()->create(['team_id' => $team->id]);
 
-        $snapshot = app(AccountEconomicsService::class)->snapshotForOrganization(
+        $this->expectException(AuthorizationException::class);
+
+        app(AccountEconomicsService::class)->snapshotForOrganization(
             $head, $organization, Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth(), 'USD',
         );
-
-        $this->assertSame($organization->id, $snapshot->organizationId);
     }
 
     public function test_a_team_head_cannot_view_another_teams_organization(): void
@@ -328,16 +334,22 @@ class AccountEconomicsServiceTest extends TestCase
         app(AccountEconomicsService::class)->resolveOrganization($manager, null, 'Acme');
     }
 
-    public function test_resolve_organization_outside_scope_is_reported_as_not_found_never_as_a_different_error(): void
+    /**
+     * Phase 12A: a Team Head is denied via the same AuthorizationException
+     * regardless of whether the referenced organization exists, belongs
+     * to their own team, or belongs to someone else's — assertAccess()
+     * rejects before any organization lookup runs at all, so there is
+     * no "not found" vs. "found but restricted" distinction to leak
+     * from in the first place.
+     */
+    public function test_a_team_head_resolving_any_organization_is_denied_before_any_lookup_happens(): void
     {
-        $ownTeam = Team::factory()->create();
-        $otherTeam = Team::factory()->create();
-        $head = User::factory()->teamHead($ownTeam)->create();
-        $restricted = Organization::factory()->create(['team_id' => $otherTeam->id, 'name' => 'Restricted Co']);
+        $team = Team::factory()->create();
+        $head = User::factory()->teamHead($team)->create();
+        $ownOrg = Organization::factory()->create(['team_id' => $team->id, 'name' => 'Own Team Co']);
 
-        $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('No organization matching');
+        $this->expectException(AuthorizationException::class);
 
-        app(AccountEconomicsService::class)->resolveOrganization($head, $restricted->id, null);
+        app(AccountEconomicsService::class)->resolveOrganization($head, $ownOrg->id, null);
     }
 }

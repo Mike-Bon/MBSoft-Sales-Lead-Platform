@@ -1,9 +1,17 @@
-# Cost-to-Serve Intelligence Agent (Phase 12)
+# Cost-to-Serve Intelligence Agent (Phase 12 / Phase 12A)
 
 This document is the authoritative reference for the Cost-to-Serve
 capability introduced in Phase 12. If this document and the code ever
 disagree, the code is a bug against this document, not the other way
 around.
+
+**Phase 12A** (access model + live feature switch) revised the
+authorization rule and added a persisted on/off toggle. Where the two
+phases differ, Phase 12A wins — the ["Phase 12A — access model and
+feature switch"](#phase-12a--access-model-and-feature-switch) section
+below is the current, authoritative statement of who can reach this
+feature, and the "Authorization (STEP 19/20)" and "UI (STEP 21-23)"
+sections have been rewritten to match it.
 
 ## Why this is a revenue/engagement agent, not a true Cost-to-Serve agent
 
@@ -82,7 +90,7 @@ per unit, true per-unit ARPU, cost growth, contribution growth.
 ```
 Customer / Account (Organization)
       ↓
-   Team (optional filter, Manager/Team-Head scoped)
+   Team (optional filter; Manager-only since Phase 12A)
       ↓
   Time period
 ```
@@ -116,10 +124,12 @@ Terminology is neutral throughout ("accounts to review", never "good"/
 - `App\Services\CostToServe\AccountEconomicsService` — the one place
   every figure is calculated (STEP 29: database aggregation via
   Eloquent `groupBy`/`selectRaw`, never raw transaction rows handed to
-  the LLM). Reuses `App\Http\Controllers\Concerns\ScopesCrmQueries`
-  for authorization scoping — the identical Manager-unrestricted/
-  Team-Head-own-team rule every other CRM query in this application
-  uses, not a second hand-rolled rule.
+  the LLM). Every public method begins with `assertAccess()` (Phase
+  12A — Manager-only + global switch, see "Authorization" above); the
+  underlying query still reuses
+  `App\Http\Controllers\Concerns\ScopesCrmQueries` (a Manager is
+  unrestricted there, so the net result for the one role that still
+  has access is unchanged), not a second hand-rolled query.
 - Five read-only `AgentTool`s (`app/Services/Ai/Tools/`):
   `get_customer_revenue_summary`, `get_customer_engagement_summary`,
   `get_revenue_concentration`, `compare_account_period`,
@@ -139,40 +149,102 @@ Terminology is neutral throughout ("accounts to review", never "good"/
 
 ## Authorization (STEP 19/20)
 
-Cost-to-Serve is Manager/Team-Head-only — commercial economics, never
-exposed to a Team Member. `AgentIdentifier::CostToServe->isAvailableTo()`
-is the single source of truth for this eligibility rule, consulted by:
+> **Phase 12A revision.** The original Phase 12 rule was
+> "Manager/Team-Head-only". Phase 12A narrowed it to **Manager-only**
+> and added a **global feature switch** on top. Both conditions must
+> hold for access. See ["Phase 12A — access model and feature
+> switch"](#phase-12a--access-model-and-feature-switch) for the
+> rationale and the full matrix; this section describes how that
+> single rule is enforced at every layer.
+
+Cost-to-Serve is Manager-only commercial economics, and only while the
+global switch is on. `App\Services\CostToServe\CostToServeAccessService`
+is the single source of truth:
+
+- `isEnabled()` — global feature status (is it on at all?). Reads the
+  `cost_to_serve.enabled` row of the `settings` table; **defaults to
+  `true`** when no row exists, so a fresh install needs no manual
+  activation.
+- `isRoleAuthorized(User)` — role authorization only, never the switch.
+  `true` for a Manager, `false` for everyone else, unconditionally.
+- `canAccess(User)` — `isRoleAuthorized() && isEnabled()`. The check
+  every *feature-access* enforcement point calls.
+
+`AgentIdentifier::CostToServe->isAvailableTo()` now delegates entirely
+to `canAccess()`, so the eligibility rule can never drift from the
+policy. It is consulted by:
 
 - The assistant's agent dropdown (`AssistantController::show()`) —
-  never offered to an ineligible user.
+  never offered to an ineligible user, and hidden from a Manager while
+  the switch is off.
 - `SendAssistantMessageRequest`'s validation — rejects an explicit
-  `agent=cost_to_serve` selection server-side regardless of what the
-  client's UI actually offered.
+  `agent=cost_to_serve` selection server-side. The failure message is
+  deliberately generic ("That assistant is not currently available.")
+  so it never reveals *why* (role vs. switch) to someone who isn't
+  role-authorized anyway.
 - `AgentRouter`'s auto-routing fallback (`AssistantController::
   sendMessage()`) — the router itself stays a pure, actor-unaware topic
   classifier (STEP 18 "routing is not security", unchanged); an
-  ineligible actor's auto-routed request falls back to the Sales
-  Intelligence agent instead.
-- `CostToServeController` (the dedicated page) — `403` for anyone who
-  isn't a Manager or Team Head.
-- `AccountEconomicsService::scopeOrganizations()` — the actual data
-  boundary every tool and the page re-derive on every call, never
-  trusting the eligibility checks above alone.
+  ineligible actor's (or an off-switch) auto-routed request falls back
+  to the Sales Intelligence agent instead.
+- `CostToServeController::index()` (the dedicated analysis page) —
+  `403` for anyone who isn't a Manager; a `cost-to-serve.disabled`
+  notice (HTTP 200, no figures) for a Manager while the switch is off.
+- `AccountEconomicsService::assertAccess()` — the actual data boundary,
+  called at the top of **every** public method (`resolveOrganization`,
+  `scopeOrganizations`, every snapshot/summary method). It re-derives
+  the full `canAccess()` decision from the actor on every call, never
+  trusting the checks above. Order matters: role first (a Team Head
+  always gets the same generic `AuthorizationException`, regardless of
+  the switch's state), then the switch (a Manager sees a message that
+  names the switch and how to turn it back on).
 
-A Team Head sees only their own team's organizations, at every layer
-(the page, every tool, and organization-name resolution — an
-out-of-scope organization is reported identically to "not found",
-never confirming it exists).
+Feature **administration** is checked separately from feature access
+(STEP 4 — "feature access ≠ feature administration"):
+
+- `CostToServeController::settings()` / `updateSettings()` and
+  `CostToServeAccessService::enable()` / `disable()` require only
+  `isManager()` — deliberately **not** `canAccess()` — so turning the
+  feature off can never lock the Manager out of turning it back on.
+- Every state change writes an `AuditLogger` entry
+  (`cost_to_serve.enabled` / `cost_to_serve.disabled`) carrying the
+  actor, the previous state, and the new state, on the dedicated
+  `audit` log channel.
+
+Team Head scoping note: because a Team Head now has no access at all,
+the Phase 12 "a Team Head sees only their own team's organizations"
+behavior is moot — every Team Head request is rejected at
+`assertAccess()` before any organization lookup runs, so there is no
+"not found" vs. "found but restricted" distinction left to leak from.
+A Manager remains unrestricted and may still pass an optional
+`team_id` filter to narrow the view to one team.
 
 ## UI (STEP 21-23)
 
-A dedicated page at `/cost-to-serve` (linked from the sidebar's
-Performance group, Manager/Team-Head only) — summary KPIs first,
-detail (top accounts, accounts to review) below, per "progressive
-disclosure." Uses the existing Phase 11A design system and components
-(`x-performance.kpi`, `flux:table`, `flux:callout`) unchanged — no new
-UI theme. A persistent callout states the data-gap plainly on every
-visit, not just when an AI question happens to surface it.
+Two dedicated pages, both linked from the sidebar's Performance group,
+**Manager-only** (a Team Head and Team Member see neither link):
+
+- **`/cost-to-serve`** (`cost-to-serve.index`) — the analysis page.
+  Summary KPIs first, detail (top accounts, accounts to review) below,
+  per "progressive disclosure." While the switch is off it renders the
+  `cost-to-serve.disabled` notice instead of any figures, with a link
+  to the settings page.
+- **`/cost-to-serve/settings`** (`cost-to-serve.settings`) — the
+  administrative toggle. A status indicator (Enabled / Disabled), a
+  single confirm-dialog form that `POST`s `enabled=0|1` to
+  `cost-to-serve.settings.update`, and a note that enabling the feature
+  does **not** grant Team Heads access. Always reachable by a Manager,
+  on or off.
+
+The sidebar's "Cost-to-Serve" analysis link carries a small **"Off"
+badge** whenever the switch is off; the "Cost-to-Serve Settings" link
+sits directly beneath it and is always shown to a Manager.
+
+All pages use the existing Phase 11A design system and components
+(`x-performance.kpi`, `flux:table`, `flux:callout`, `flux:badge`)
+unchanged — no new UI theme. A persistent callout on the analysis page
+states the data-gap plainly on every visit, not just when an AI
+question happens to surface it.
 
 ## Audit (STEP 26)
 
@@ -182,18 +254,108 @@ audit trail (Phase 7/9, unmodified) — user, timestamp, the message,
 which tools were called with which arguments, status, and token usage
 — exactly like the other three agents. Reused, not duplicated.
 
+## Phase 12A — access model and feature switch
+
+### What changed and why
+
+Phase 12 shipped Cost-to-Serve as **Manager/Team-Head-only**. Phase
+12A revised that to two independent conditions that must *both* hold:
+
+| Condition | Owner | Default | Notes |
+|---|---|---|---|
+| **Role authorization** — the user's role | Fixed in code | Manager only | Narrowed from "Manager or Team Head". There is no per-Team-Head toggle, deliberately — commercial economics is management-level information (CLAUDE.md least-privilege). |
+| **Global feature switch** — is the feature on at all | The Manager, live, from the UI | **ON** | Persisted in the new `settings` table (`cost_to_serve.enabled`). A fresh install with no row is treated as ON. |
+
+Why a switch at all: the Manager needs to be able to turn the whole
+capability off (and back on) without a code deploy — the only prior
+precedent (`config('services.workflows.*.enabled')`) is env-driven and
+needs a deployment to change, which cannot satisfy "the Manager toggles
+this live, and it persists".
+
+### The final policy (must not be widened)
+
+**Manager**
+- Cost-to-Serve is ON by default.
+- The Manager can turn it ON or OFF, at any time, from
+  `/cost-to-serve/settings` — this is *administration*, gated on
+  `isManager()` alone, so turning it OFF never locks the Manager out
+  of turning it back ON.
+- While it is ON, the Manager can use the analysis page, the assistant
+  agent, and every tool.
+- While it is OFF, the Manager sees the settings page and the
+  `cost-to-serve.disabled` notice, and nothing else — no figures, no
+  agent, no tool results.
+
+**Team Head**
+- Cost-to-Serve is OFF for them — permanently, structurally, at every
+  layer.
+- They cannot enable it (the settings page and toggle endpoint return
+  `403`; `CostToServeAccessService::enable()` throws).
+- A Manager enabling the feature does **not** enable it for Team Heads
+  — `canAccess()` for a Team Head is `false` regardless of the switch.
+- They never see the sidebar links, the assistant dropdown entry, or
+  any tool/page output; every service call throws the same generic
+  `AuthorizationException` before any data lookup.
+
+**Team Member** — never had access; unchanged.
+
+### Mechanism
+
+- **`settings` table** (`database/migrations/2026_08_31_080000_create_settings_table.php`)
+  — a deliberately generic `key`/`value` store (not a
+  `cost_to_serve_settings` table) so a future feature flag reuses it.
+  RLS follows the codebase-wide default-deny pattern (`ENABLE` +
+  `FORCE`, no policies; the application role has `BYPASSRLS`).
+- **`App\Models\Setting`** — `getValue()` / `setValue()` are the only
+  intended access path. Not itself an authorization boundary.
+- **`App\Services\CostToServe\CostToServeAccessService`** — the single
+  source of truth: `isEnabled()`, `isRoleAuthorized()`, `canAccess()`,
+  and the audited `enable()` / `disable()`. No caching — a single
+  indexed key lookup, and a cache would only add a staleness risk.
+- Enforcement points: `AgentIdentifier::CostToServe->isAvailableTo()`,
+  `SendAssistantMessageRequest`, `AgentRouter` fallback,
+  `CostToServeController` (`index` / `settings` / `updateSettings`),
+  and `AccountEconomicsService::assertAccess()` — see "Authorization
+  (STEP 19/20)" above for exactly what each does.
+- **Not** changed: `AgentRouter` stays a pure topic classifier;
+  `AccountEconomicsService`'s calculations; the tool contracts; the
+  `AgentInteraction` audit trail.
+
+### Migration status
+
+The `settings` table migration is **written and green in the test
+suite** (SQLite in-memory) but has **not** been run against Supabase.
+That is the one remaining deploy step for Phase 12A — see the gate
+report.
+
 ## Testing
 
-56 new tests: `AccountEconomicsServiceTest` (calculation correctness,
-zero-unit/zero-revenue/zero-deal edge cases, currency isolation,
-authorization), `CostToServeToolsTest` (all 5 tools), `MetricChangeTest`
-(zero-denominator handling), `CostToServeAgentAccessTest` (dropdown
-filtering, explicit-selection rejection, auto-routing fallback),
-`CostToServePromptInjectionTest` (injected organization notes, crafted
-cross-team arguments, no SQL/write tool exists), `CostToServeControllerTest`
-(page authorization and scoping), plus `AgentRegistryTest` extended for
-the fourth agent's tool matrix. Full regression suite: 599 passed, 0
-failed.
+**Phase 12 (original):** 56 tests across `AccountEconomicsServiceTest`,
+`CostToServeToolsTest`, `MetricChangeTest`, `CostToServeAgentAccessTest`,
+`CostToServePromptInjectionTest`, `CostToServeControllerTest`, plus
+`AgentRegistryTest` for the fourth agent's tool matrix.
+
+**Phase 12A additions / revisions:**
+
+- **`Tests\Feature\CostToServe\CostToServeAccessPolicyTest`** — new,
+  the single exhaustive reference for the access policy (every other
+  Cost-to-Serve test docblock points here): the
+  `isEnabled` / `isRoleAuthorized` / `canAccess` matrix, "enabling
+  never grants a Team Head access", persistence across resolutions,
+  single-row invariant, audit entries, the full HTTP surface of
+  `GET`/`POST /cost-to-serve/settings` (Manager / Team Head / Team
+  Member / guest, `required` + `boolean` validation, CSRF via the
+  `web` group, enable→disable→enable round trip), and sidebar
+  visibility (both links Manager-only, "Off" badge present only while
+  disabled).
+- `CostToServeControllerTest`, `CostToServeAgentAccessTest`,
+  `CostToServeToolsTest`, `CostToServePromptInjectionTest`,
+  `AccountEconomicsServiceTest` — updated: Team Head cases flipped from
+  "own-team scoped" to "denied", new "feature switch off" cases at
+  every layer.
+
+Full regression suite after Phase 12A: **629 passed, 0 failed**
+(`php artisan test`); `./vendor/bin/pint --test` clean.
 
 ## Future compatibility (STEP 34)
 
@@ -224,3 +386,13 @@ needed for that.
    phase** (same situation as every prior AI phase) — every automated
    test uses `FakeLlmProvider`. Live model behavior when actually
    explaining a data gap to a Manager was not verified.
+6. **Phase 12A: the `settings` table migration has not been run
+   against Supabase** — it passes in the test suite (SQLite in-memory)
+   but the production/dev schema change is deferred to a deliberate
+   deploy step. Until it runs, `Setting::getValue()` on the real
+   database would error; `isEnabled()`'s `true` default only applies
+   once the table exists and is simply empty.
+7. **Phase 12A: no per-Team-Head granularity** — the switch is global.
+   The design leaves room for a future, more granular rule without
+   changing `CostToServeAccessService::canAccess()`'s signature or any
+   caller, but none exists now: a Team Head is unconditionally denied.

@@ -5,16 +5,19 @@ namespace Tests\Feature\CostToServe;
 use App\Enums\OpportunityStage;
 use App\Models\Opportunity;
 use App\Models\Organization;
-use App\Models\Team;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * Phase 12 STEP 21: the dedicated Cost-to-Serve page — Manager/Team-Head
- * only, and every figure shown must trace back to
- * AccountEconomicsService (never a page-local recalculation).
+ * Phase 12 STEP 21 / Phase 12A: the dedicated Cost-to-Serve page —
+ * Manager-only (Team Head access removed in Phase 12A), only reachable
+ * with the global feature switch on, and every figure shown must trace
+ * back to AccountEconomicsService (never a page-local recalculation).
+ * The full access matrix and every bypass vector live in
+ * CostToServeAccessPolicyTest.
  */
 class CostToServeControllerTest extends TestCase
 {
@@ -35,11 +38,11 @@ class CostToServeControllerTest extends TestCase
             ->assertSee('no cost data', false);
     }
 
-    public function test_a_team_head_can_view_the_page(): void
+    public function test_a_team_head_is_forbidden_even_with_the_feature_on(): void
     {
         $head = User::factory()->teamHead()->create();
 
-        $this->actingAs($head)->get('/cost-to-serve')->assertOk();
+        $this->actingAs($head)->get('/cost-to-serve')->assertForbidden();
     }
 
     public function test_a_team_member_is_forbidden(): void
@@ -47,6 +50,26 @@ class CostToServeControllerTest extends TestCase
         $member = User::factory()->create();
 
         $this->actingAs($member)->get('/cost-to-serve')->assertForbidden();
+    }
+
+    public function test_a_manager_sees_the_disabled_notice_instead_of_data_when_the_feature_is_off(): void
+    {
+        Setting::setValue('cost_to_serve.enabled', 'false');
+        $manager = User::factory()->manager()->create();
+        $organization = Organization::factory()->create(['name' => 'Acme Logistics']);
+        Opportunity::factory()->create([
+            'organization_id' => $organization->id,
+            'stage' => OpportunityStage::ClosedWon,
+            'value' => 424242,
+            'currency' => 'USD',
+            'closed_at' => Carbon::now(),
+        ]);
+
+        $this->actingAs($manager)->get('/cost-to-serve')
+            ->assertOk()
+            ->assertSee('currently disabled', false)
+            ->assertDontSee('424,242')
+            ->assertDontSee('Acme Logistics');
     }
 
     public function test_the_page_shows_the_actual_calculated_revenue(): void
@@ -67,20 +90,18 @@ class CostToServeControllerTest extends TestCase
             ->assertSee('12,345');
     }
 
-    public function test_a_team_head_only_sees_their_own_teams_accounts(): void
+    public function test_a_manager_sees_every_teams_accounts(): void
     {
-        $ownTeam = Team::factory()->create();
-        $otherTeam = Team::factory()->create();
-        $head = User::factory()->teamHead($ownTeam)->create();
+        $manager = User::factory()->manager()->create();
+        $orgA = Organization::factory()->create(['name' => 'Alpha Account']);
+        $orgB = Organization::factory()->create(['name' => 'Bravo Account']);
 
-        $ownOrg = Organization::factory()->create(['team_id' => $ownTeam->id, 'name' => 'Own Team Account']);
-        $otherOrg = Organization::factory()->create(['team_id' => $otherTeam->id, 'name' => 'Other Team Account']);
+        Opportunity::factory()->create(['organization_id' => $orgA->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 500, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
+        Opportunity::factory()->create(['organization_id' => $orgB->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 500, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
 
-        Opportunity::factory()->create(['organization_id' => $ownOrg->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 500, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
-        Opportunity::factory()->create(['organization_id' => $otherOrg->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 500, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
-
-        $response = $this->actingAs($head)->get('/cost-to-serve');
-
-        $response->assertOk()->assertSee('Own Team Account')->assertDontSee('Other Team Account');
+        $this->actingAs($manager)->get('/cost-to-serve')
+            ->assertOk()
+            ->assertSee('Alpha Account')
+            ->assertSee('Bravo Account');
     }
 }

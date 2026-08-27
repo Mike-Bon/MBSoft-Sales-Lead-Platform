@@ -50,8 +50,12 @@ class CostToServePromptInjectionTest extends TestCase
         $this->assertSame(CostToServeAgentPrompt::text(), $provider->calls[1]['system']);
     }
 
-    public function test_a_crafted_team_id_argument_cannot_cross_a_team_heads_boundary(): void
+    public function test_a_crafted_tool_call_from_a_team_head_is_denied_and_leaks_nothing(): void
     {
+        // Phase 12A: a Team Head has no Cost-to-Serve access at all, so
+        // this is now denied at assertAccess() before the crafted
+        // team_id is ever looked at — the tool result is an error and
+        // carries no account data of any kind.
         $ownTeam = Team::factory()->create();
         $otherTeam = Team::factory()->create();
         $head = User::factory()->teamHead($ownTeam)->create();

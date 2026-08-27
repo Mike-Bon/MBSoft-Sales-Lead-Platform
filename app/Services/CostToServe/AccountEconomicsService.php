@@ -30,14 +30,41 @@ use Illuminate\Validation\ValidationException;
  * component anywhere in this class: see docs/COST_TO_SERVE.md for the
  * full data-availability matrix this was built against.
  *
- * Authorization mirrors OrganizationPolicy/AuthorizesCrmRecords exactly
- * (Manager unrestricted; Team Head limited to their own team's
- * organizations) but as query scoping rather than a per-record check,
- * since every method here operates over a set of organizations.
+ * Phase 12A: every public method starts with assertAccess(), which
+ * combines role authorization (Manager only — Team Head access was
+ * removed this phase, see docs/COST_TO_SERVE.md's Phase 12A section)
+ * with the global feature switch (CostToServeAccessService). This is
+ * the actual enforcement boundary — every AgentTool and the dedicated
+ * controller call into this class, never straight to Eloquent, so
+ * there is exactly one place this policy can be bypassed from, and it
+ * can't be.
  */
 class AccountEconomicsService
 {
     use ScopesCrmQueries;
+
+    public function __construct(private readonly CostToServeAccessService $access) {}
+
+    /**
+     * Phase 12A: the one gate every public method below starts with —
+     * combines role authorization (Manager only) with the global
+     * feature switch. Checked in this order deliberately: a Team Head
+     * always gets the same generic "unauthorized" message regardless
+     * of the switch's state, so the switch's on/off value is never
+     * revealed to someone who could never use the feature anyway.
+     *
+     * @throws AuthorizationException
+     */
+    private function assertAccess(User $actor): void
+    {
+        if (! $this->access->isRoleAuthorized($actor)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
+        if (! $this->access->isEnabled()) {
+            throw new AuthorizationException('Cost-to-Serve is currently disabled. A Manager can re-enable it from Cost-to-Serve Settings.');
+        }
+    }
 
     /**
      * Resolves a tool's `organization_id`/`organization_name` argument
@@ -50,10 +77,13 @@ class AccountEconomicsService
      * denies that a restricted organization exists (STEP 27:
      * unauthorized-access probing must learn nothing).
      *
+     * @throws AuthorizationException
      * @throws ValidationException
      */
     public function resolveOrganization(User $actor, ?int $organizationId, ?string $organizationName): Organization
     {
+        $this->assertAccess($actor);
+
         $query = $this->scopeToUser(Organization::query(), $actor);
 
         if ($organizationId !== null) {
@@ -232,27 +262,23 @@ class AccountEconomicsService
     }
 
     /**
-     * STEP 19/20: Cost-to-Serve is Manager/Team-Head-only commercial
-     * information (never a Team Member, unlike the general CRM query
-     * scoping this reuses) — reuses
-     * App\Http\Controllers\Concerns\ScopesCrmQueries::scopeToUser
-     * exactly (Manager unrestricted; Team Head limited to their own
-     * team's organizations, same as every CRM index page) rather than a
-     * second, hand-rolled authorization rule. Never trusts a
-     * client-supplied team id beyond confirming it matches the actor's
-     * own team.
+     * Phase 12A: Cost-to-Serve is Manager-only commercial information,
+     * and only while the global feature switch is on (assertAccess()).
+     * Team Head is never authorized here regardless of the switch — a
+     * change from Phase 12's original Manager-or-Team-Head scoping,
+     * required to enforce this phase's access policy. Reuses
+     * App\Http\Controllers\Concerns\ScopesCrmQueries::scopeToUser for
+     * the actual query (a Manager is unrestricted there too, so the
+     * net effect is unchanged for the one role that still has access)
+     * rather than a second, hand-rolled query. `$requestedTeamId` is
+     * kept as an optional filter (a Manager may still narrow to one
+     * team) even though only Manager reaches this method now.
      *
      * @throws AuthorizationException
      */
     private function scopeOrganizations(Builder $query, User $actor, ?int $requestedTeamId = null): Builder
     {
-        if (! $actor->isManager() && ! $actor->isTeamHead()) {
-            throw new AuthorizationException('This action is unauthorized.');
-        }
-
-        if ($requestedTeamId !== null && $actor->isTeamHead() && $requestedTeamId !== $actor->team_id) {
-            throw new AuthorizationException('You may only view your own team\'s accounts.');
-        }
+        $this->assertAccess($actor);
 
         $query = $this->scopeToUser($query, $actor);
 

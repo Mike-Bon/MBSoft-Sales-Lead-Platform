@@ -35,12 +35,20 @@
                 <flux:navlist.group heading="Performance">
                     <flux:navlist.item icon="flag" :href="route('performance.targets.index')" :current="request()->routeIs('performance.targets.*')" wire:navigate>Targets</flux:navlist.item>
                     <flux:navlist.item icon="chart-bar" :href="route('performance.index')" :current="request()->routeIs('performance.index')" wire:navigate>Performance</flux:navlist.item>
-                    {{-- Phase 12: Manager/Team-Head only, matching
-                         AgentIdentifier::CostToServe's own eligibility
-                         rule — reused here rather than a second,
-                         separately-maintained role check. --}}
-                    @if (\App\Enums\AgentIdentifier::CostToServe->isAvailableTo(auth()->user()))
-                        <flux:navlist.item icon="banknotes" :href="route('cost-to-serve.index')" :current="request()->routeIs('cost-to-serve.*')" wire:navigate>Cost-to-Serve</flux:navlist.item>
+                    {{-- Phase 12A: role-only check (never the combined
+                         feature-switch check AgentIdentifier::
+                         CostToServe->isAvailableTo() uses for the AI
+                         assistant) — a Manager must always be able to
+                         reach this area to see its status and turn the
+                         switch back on, even while it's off. Team Head
+                         never sees either link regardless of the switch.
+                         The "Off" badge on the analysis link reflects
+                         the global switch; the Settings link is always
+                         reachable so the Manager can turn it back on. --}}
+                    @if (auth()->user()->isManager())
+                        @php($costToServeEnabled = app(\App\Services\CostToServe\CostToServeAccessService::class)->isEnabled())
+                        <flux:navlist.item icon="banknotes" :href="route('cost-to-serve.index')" :current="request()->routeIs('cost-to-serve.index')" :badge="$costToServeEnabled ? null : 'Off'" badge-color="zinc" wire:navigate>Cost-to-Serve</flux:navlist.item>
+                        <flux:navlist.item icon="cog-6-tooth" :href="route('cost-to-serve.settings')" :current="request()->routeIs('cost-to-serve.settings')" wire:navigate>Cost-to-Serve Settings</flux:navlist.item>
                     @endif
                 </flux:navlist.group>
 

@@ -6,6 +6,7 @@ use App\Enums\OpportunityStage;
 use App\Models\Activity;
 use App\Models\Opportunity;
 use App\Models\Organization;
+use App\Models\Setting;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Ai\Tools\CompareAccountPeriodTool;
@@ -20,9 +21,10 @@ use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
- * Phase 12: the 5 Cost-to-Serve tool contracts — correct data,
- * source/data-gap fields present on every result, and authorization
- * re-derived from the actor regardless of arguments.
+ * Phase 12 + Phase 12A: the 5 Cost-to-Serve tool contracts — correct
+ * data, source/data-gap fields present on every result, and
+ * authorization re-derived from the actor (Manager only, feature switch
+ * on) regardless of arguments, on every call.
  */
 class CostToServeToolsTest extends TestCase
 {
@@ -101,33 +103,52 @@ class CostToServeToolsTest extends TestCase
         $this->assertCount(2, $result['accounts']);
     }
 
-    public function test_a_team_head_using_revenue_concentration_never_sees_another_teams_accounts(): void
+    public function test_a_team_head_is_denied_by_every_tool_regardless_of_arguments(): void
     {
         $ownTeam = Team::factory()->create();
-        $otherTeam = Team::factory()->create();
         $head = User::factory()->teamHead($ownTeam)->create();
-
-        $ownOrg = Organization::factory()->create(['team_id' => $ownTeam->id]);
-        $otherOrg = Organization::factory()->create(['team_id' => $otherTeam->id]);
+        $ownOrg = Organization::factory()->create(['team_id' => $ownTeam->id, 'name' => 'Own Team Account']);
         Opportunity::factory()->create(['organization_id' => $ownOrg->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 100, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
-        Opportunity::factory()->create(['organization_id' => $otherOrg->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 100, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
 
-        $result = app(GetRevenueConcentrationTool::class)->execute($head, []);
-
-        $organizationIds = collect($result['accounts'])->pluck('organization_id');
-        $this->assertTrue($organizationIds->contains($ownOrg->id));
-        $this->assertFalse($organizationIds->contains($otherOrg->id));
+        // Phase 12A: a Team Head has no Cost-to-Serve access at all —
+        // not even to their own team's own account, and not even with
+        // no arguments. assertAccess() rejects before any lookup runs.
+        foreach ([
+            fn () => app(GetRevenueConcentrationTool::class)->execute($head, []),
+            fn () => app(GetRevenueConcentrationTool::class)->execute($head, ['team_id' => $ownTeam->id]),
+            fn () => app(GetCustomerRevenueSummaryTool::class)->execute($head, ['organization_id' => $ownOrg->id]),
+            fn () => app(GetCustomerEngagementSummaryTool::class)->execute($head, ['organization_id' => $ownOrg->id]),
+            fn () => app(IdentifyRevenueExceptionsTool::class)->execute($head, []),
+        ] as $call) {
+            try {
+                $call();
+                $this->fail('Expected AuthorizationException for a Team Head.');
+            } catch (AuthorizationException $e) {
+                $this->assertSame('This action is unauthorized.', $e->getMessage());
+            }
+        }
     }
 
-    public function test_a_team_head_requesting_another_teams_id_via_revenue_concentration_is_denied(): void
+    public function test_every_tool_is_denied_for_a_manager_when_the_feature_switch_is_off(): void
     {
-        $ownTeam = Team::factory()->create();
-        $otherTeam = Team::factory()->create();
-        $head = User::factory()->teamHead($ownTeam)->create();
+        Setting::setValue('cost_to_serve.enabled', 'false');
+        $manager = User::factory()->manager()->create();
+        $org = Organization::factory()->create();
 
-        $this->expectException(AuthorizationException::class);
-
-        app(GetRevenueConcentrationTool::class)->execute($head, ['team_id' => $otherTeam->id]);
+        foreach ([
+            fn () => app(GetRevenueConcentrationTool::class)->execute($manager, []),
+            fn () => app(GetCustomerRevenueSummaryTool::class)->execute($manager, ['organization_id' => $org->id]),
+            fn () => app(GetCustomerEngagementSummaryTool::class)->execute($manager, ['organization_id' => $org->id]),
+            fn () => app(CompareAccountPeriodTool::class)->execute($manager, ['organization_id' => $org->id, 'period_start' => '2026-06-01', 'period_end' => '2026-06-30']),
+            fn () => app(IdentifyRevenueExceptionsTool::class)->execute($manager, []),
+        ] as $call) {
+            try {
+                $call();
+                $this->fail('Expected AuthorizationException while the feature is off.');
+            } catch (AuthorizationException $e) {
+                $this->assertStringContainsString('disabled', $e->getMessage());
+            }
+        }
     }
 
     public function test_compare_account_period_defaults_the_previous_period_to_the_preceding_window(): void
