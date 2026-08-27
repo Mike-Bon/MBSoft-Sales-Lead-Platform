@@ -23,16 +23,70 @@
     --color-zinc-900: #171717;
     --color-zinc-950: #0a0a0a;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
+    /*
+     * Phase 11A — V1 design system. Two kinds of token, deliberately:
+     *
+     *  - Brand constants (--color-primary/navy/success/warning/danger):
+     *    the seven approved hex values, fixed by mode (they carry
+     *    meaning on their own — a status color shouldn't quietly
+     *    change what it looks like between themes). Used directly for
+     *    branding, primary actions, and status meaning.
+     *  - Semantic surface tokens (--color-background/surface/muted/
+     *    text/text-muted/border): mode-aware roles built FROM the
+     *    brand constants, redefined below for dark mode — this is
+     *    what makes dark mode an intentional theme rather than a CSS
+     *    invert filter.
+     *
+     * Flux's own --color-accent/--color-accent-content/
+     * --color-accent-foreground (used throughout every Flux
+     * component — primary buttons, active nav items, focus rings,
+     * selected states) are repointed to --color-primary below, so the
+     * existing component library carries the brand color everywhere
+     * without per-template changes (Phase 11A §19/20).
+     */
+    --color-primary: #0f4c81;
+    --color-navy: #1a2530;
+    --color-success: #28a745;
+    --color-warning: #ffc107;
+    --color-danger: #dc3545;
+
+    --color-background: #f4f6f9;
+    --color-surface: #ffffff;
+    --color-muted: #f4f6f9;
+    --color-text: #1a2530;
+    --color-text-muted: #5b6675;
+    --color-border: #e2e8f0;
+
+    --color-accent: var(--color-primary);
+    --color-accent-content: var(--color-primary);
     --color-accent-foreground: var(--color-white);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        /* Brand constants stay fixed except --color-primary, which is
+         * deliberately lightened for legibility against a dark
+         * surface — the same hue family, not a different color. */
+        --color-primary: #4a90d9;
+        --color-success: #3dbe5c;
+        --color-warning: #ffcb3d;
+        --color-danger: #e5546a;
+
+        /* A coherent dark theme built on Deep Navy, not an inverted
+         * light theme: the canvas is darker than the surface (depth),
+         * and Deep Navy itself becomes the card/table surface color —
+         * directly reusing the brand's own "sidebar" color rather than
+         * inventing an unrelated dark gray. */
+        --color-background: #12181f;
+        --color-surface: #1a2530;
+        --color-muted: #212b36;
+        --color-text: #f4f6f9;
+        --color-text-muted: #9aa7b5;
+        --color-border: #2c3947;
+
+        --color-accent: var(--color-primary);
+        --color-accent-content: var(--color-primary);
+        --color-accent-foreground: var(--color-white);
     }
 }
 

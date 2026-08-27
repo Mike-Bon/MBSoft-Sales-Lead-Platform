@@ -30,9 +30,9 @@
 
         <x-performance.period-selector :period="$period" />
 
-        <x-ai.insights-card :insights="$aiInsights" />
-
-        {{-- A. Organisation performance --}}
+        {{-- A. Organisation performance — the primary "how am I doing"
+             answer leads, ahead of AI Insights (Phase 11A: attention
+             items belong after the headline numbers, not before). --}}
         <flux:heading size="lg" class="mb-2">Organisation Performance</flux:heading>
         <div class="mb-4">
             <x-performance.kpi-row :snapshot="$organisation" />
@@ -40,6 +40,8 @@
         <div class="mb-8 max-w-xl">
             <x-performance.target-vs-actual :snapshot="$organisation" />
         </div>
+
+        <x-ai.insights-card :insights="$aiInsights" />
 
         {{-- B. Team performance --}}
         <div class="mb-2 flex items-center justify-between">
@@ -126,9 +128,12 @@
             <x-performance.kpi label="Failed" :value="$communicationMetrics['failed']" />
         </div>
 
-        {{-- Attention areas --}}
+        {{-- Attention areas. "Teams Behind or At Risk" was removed from
+             here (Phase 11A): the Team Performance table above already
+             shows the identical Signal per team — repeating it a
+             second time added no information, only noise. --}}
         <flux:heading size="lg" class="mb-2">Needs Attention</flux:heading>
-        <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div>
                 <flux:subheading class="mb-2">Overdue Follow-ups</flux:subheading>
                 <x-performance.attention-leads :leads="$attention['overdueLeads']" show-owner empty-message="No overdue follow-ups." />
@@ -140,19 +145,6 @@
             <div>
                 <flux:subheading class="mb-2">Opportunities Closing Soon</flux:subheading>
                 <x-performance.attention-opportunities :opportunities="$attention['closingSoonOpportunities']" show-owner empty-message="Nothing closing in the next two weeks." />
-            </div>
-            <div>
-                <flux:subheading class="mb-2">Teams Behind or At Risk</flux:subheading>
-                <div class="space-y-2">
-                    @forelse ($attention['behindTeams'] as $row)
-                        <a href="{{ route('performance.teams.show', $row['team']) }}" wire:navigate class="flex items-center justify-between rounded-lg border border-zinc-200 p-3 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50">
-                            <span class="font-medium">{{ $row['team']->name }}</span>
-                            <x-performance.signal-badge :signal="$row['snapshot']->managementSignal()" />
-                        </a>
-                    @empty
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">No teams currently behind or at risk.</p>
-                    @endforelse
-                </div>
             </div>
         </div>
     </div>

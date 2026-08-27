@@ -23,6 +23,7 @@
         :undefined="$snapshot->achievementPercent === null"
         undefined-label="No target assigned"
         :value="$snapshot->achievementPercent !== null ? number_format($snapshot->achievementPercent, 1).'%' : null"
+        :signal="$snapshot->managementSignal()"
     />
     <x-performance.kpi
         label="Gap"

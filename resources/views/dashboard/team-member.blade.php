@@ -10,8 +10,6 @@
 
         <x-performance.period-selector :period="$period" />
 
-        <x-ai.insights-card :insights="$aiInsights" />
-
         <flux:heading size="lg" class="mb-2">My Performance</flux:heading>
         <div class="mb-4">
             <x-performance.kpi-row :snapshot="$snapshot" />
@@ -26,6 +24,8 @@
             <x-performance.kpi label="Overdue Follow-ups" :value="$followUpCounts['overdue']" />
             <x-performance.kpi label="Upcoming Follow-ups" :value="$followUpCounts['upcoming']" />
         </div>
+
+        <x-ai.insights-card :insights="$aiInsights" />
 
         <div class="mb-8 flex gap-3">
             <flux:button size="sm" href="{{ route('crm.leads.index', ['owner_id' => $user->id]) }}" wire:navigate>My Leads</flux:button>
