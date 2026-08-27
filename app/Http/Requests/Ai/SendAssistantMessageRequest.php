@@ -26,7 +26,20 @@ class SendAssistantMessageRequest extends FormRequest
     {
         return [
             'message' => ['required', 'string', 'max:'.(int) config('services.ai.max_message_length', 2000)],
-            'agent' => ['nullable', Rule::enum(AgentIdentifier::class)],
+            'agent' => [
+                'nullable',
+                Rule::enum(AgentIdentifier::class),
+                // Phase 12: never trust the client to only offer an
+                // eligible agent in the dropdown — re-checked here
+                // server-side regardless of what was actually submitted.
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    $agent = AgentIdentifier::tryFrom((string) $value);
+
+                    if ($agent !== null && $this->user() !== null && ! $agent->isAvailableTo($this->user())) {
+                        $fail('That assistant is not available to your role.');
+                    }
+                },
+            ],
         ];
     }
 }

@@ -35,6 +35,13 @@
                 <flux:navlist.group heading="Performance">
                     <flux:navlist.item icon="flag" :href="route('performance.targets.index')" :current="request()->routeIs('performance.targets.*')" wire:navigate>Targets</flux:navlist.item>
                     <flux:navlist.item icon="chart-bar" :href="route('performance.index')" :current="request()->routeIs('performance.index')" wire:navigate>Performance</flux:navlist.item>
+                    {{-- Phase 12: Manager/Team-Head only, matching
+                         AgentIdentifier::CostToServe's own eligibility
+                         rule — reused here rather than a second,
+                         separately-maintained role check. --}}
+                    @if (\App\Enums\AgentIdentifier::CostToServe->isAvailableTo(auth()->user()))
+                        <flux:navlist.item icon="banknotes" :href="route('cost-to-serve.index')" :current="request()->routeIs('cost-to-serve.*')" wire:navigate>Cost-to-Serve</flux:navlist.item>
+                    @endif
                 </flux:navlist.group>
 
                 <flux:navlist.group heading="Communication & AI">

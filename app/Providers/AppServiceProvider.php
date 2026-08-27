@@ -10,19 +10,25 @@ use App\Enums\KnowledgeType;
 use App\Enums\WorkflowType;
 use App\Services\Ai\AgentRegistry;
 use App\Services\Ai\Prompts\CommunicationAgentPrompt;
+use App\Services\Ai\Prompts\CostToServeAgentPrompt;
 use App\Services\Ai\Prompts\PerformanceAgentPrompt;
 use App\Services\Ai\Prompts\SalesAgentPrompt;
 use App\Services\Ai\Providers\AnthropicProvider;
 use App\Services\Ai\ToolRegistry;
+use App\Services\Ai\Tools\CompareAccountPeriodTool;
 use App\Services\Ai\Tools\DraftEmailTool;
 use App\Services\Ai\Tools\DraftWhatsAppTool;
 use App\Services\Ai\Tools\GetCommunicationHistoryTool;
+use App\Services\Ai\Tools\GetCustomerEngagementSummaryTool;
+use App\Services\Ai\Tools\GetCustomerRevenueSummaryTool;
 use App\Services\Ai\Tools\GetFollowupsTool;
 use App\Services\Ai\Tools\GetLeadTool;
 use App\Services\Ai\Tools\GetMyPerformanceTool;
 use App\Services\Ai\Tools\GetOpportunityTool;
 use App\Services\Ai\Tools\GetPipelineSummaryTool;
+use App\Services\Ai\Tools\GetRevenueConcentrationTool;
 use App\Services\Ai\Tools\GetTeamPerformanceTool;
+use App\Services\Ai\Tools\IdentifyRevenueExceptionsTool;
 use App\Services\Ai\Tools\SearchKnowledgeTool;
 use App\Services\Ai\Tools\SearchLeadsTool;
 use App\Services\Ai\Tools\SearchOpportunitiesTool;
@@ -120,6 +126,30 @@ class AppServiceProvider extends ServiceProvider
                         ]),
                     ]),
                     allowedWorkflows: [WorkflowType::DailyFollowUpReview],
+                    maxToolIterations: $maxIterations,
+                ),
+                // Phase 12: a fourth, deliberate, explicitly-scoped
+                // agent — Manager/Team-Head only (AssistantController
+                // gates selection and routing; every tool below also
+                // re-derives its own authorization from the actor,
+                // never trusting that gate alone). No workflow — this
+                // phase does not add a scheduled Cost-to-Serve review.
+                new AgentDefinition(
+                    identifier: AgentIdentifier::CostToServe,
+                    name: AgentIdentifier::CostToServe->label(),
+                    purpose: 'Revenue and sales-engagement analysis for commercial account review.',
+                    systemPrompt: CostToServeAgentPrompt::text(),
+                    tools: new ToolRegistry([
+                        $app->make(GetCustomerRevenueSummaryTool::class),
+                        $app->make(GetCustomerEngagementSummaryTool::class),
+                        $app->make(GetRevenueConcentrationTool::class),
+                        $app->make(CompareAccountPeriodTool::class),
+                        $app->make(IdentifyRevenueExceptionsTool::class),
+                        new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
+                            KnowledgeType::Policy,
+                        ]),
+                    ]),
+                    allowedWorkflows: [],
                     maxToolIterations: $maxIterations,
                 ),
             ]);

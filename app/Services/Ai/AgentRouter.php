@@ -34,12 +34,26 @@ final class AgentRouter
         'pipeline', 'opportunit', 'lead', 'deal', 'prospect', 'account', 'prioriti', 'stalled', 'stale',
     ];
 
+    /**
+     * Phase 12: checked before Performance/Sales — "cost to serve" and
+     * "contribution" would otherwise also match SALES_KEYWORDS'
+     * "account", landing on the wrong agent.
+     */
+    private const COST_TO_SERVE_KEYWORDS = [
+        'cost to serve', 'cost-to-serve', 'contribution', 'expensive to serve',
+        'economic yield', 'profitability', 'revenue per deal', 'arpu',
+    ];
+
     public function route(string $message): AgentIdentifier
     {
         $lower = strtolower($message);
 
         if ($this->matchesAny($lower, self::COMMUNICATION_KEYWORDS)) {
             return AgentIdentifier::Communication;
+        }
+
+        if ($this->matchesAny($lower, self::COST_TO_SERVE_KEYWORDS)) {
+            return AgentIdentifier::CostToServe;
         }
 
         $matchesPerformance = $this->matchesAny($lower, self::PERFORMANCE_KEYWORDS);

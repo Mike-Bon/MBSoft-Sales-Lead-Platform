@@ -10,7 +10,8 @@ use InvalidArgumentException;
 use Tests\TestCase;
 
 /**
- * STEP 48/24: the registry resolves exactly the three approved agents,
+ * STEP 48/24: the registry resolves exactly the four approved agents
+ * (Sales, Performance, Communication, and Phase 12's Cost-to-Serve),
  * each with its own explicit, non-overlapping-beyond-design tool
  * permission matrix — no agent receives a tool it isn't listed for.
  */
@@ -28,9 +29,11 @@ class AgentRegistryTest extends TestCase
         }
     }
 
-    public function test_the_registry_lists_exactly_three_agents(): void
+    public function test_the_registry_lists_exactly_four_agents(): void
     {
-        $this->assertCount(3, app(AgentRegistry::class)->all());
+        // Phase 12 STEP: Cost-to-Serve is the fourth, deliberate,
+        // explicitly-scoped expansion of the closed set.
+        $this->assertCount(4, app(AgentRegistry::class)->all());
     }
 
     public function test_sales_agent_has_the_documented_tool_set_and_no_others(): void
@@ -77,6 +80,24 @@ class AgentRegistryTest extends TestCase
         }
     }
 
+    /**
+     * Phase 12: the fourth agent's own tool set — revenue/engagement
+     * analysis only, never a CRM search/draft/performance-calculation
+     * tool.
+     */
+    public function test_cost_to_serve_agent_has_the_documented_tool_set_and_no_others(): void
+    {
+        $tools = app(AgentRegistry::class)->get(AgentIdentifier::CostToServe)->tools;
+
+        foreach (['get_customer_revenue_summary', 'get_customer_engagement_summary', 'get_revenue_concentration', 'compare_account_period', 'identify_revenue_exceptions'] as $tool) {
+            $this->assertNotNull($tools->find($tool), "Cost-to-Serve Agent is missing {$tool}.");
+        }
+
+        foreach (['search_leads', 'get_lead', 'search_opportunities', 'get_opportunity', 'get_my_performance', 'get_team_performance', 'draft_email', 'draft_whatsapp', 'get_followups', 'get_communication_history'] as $tool) {
+            $this->assertNull($tools->find($tool), "Cost-to-Serve Agent must not have {$tool}.");
+        }
+    }
+
     public function test_no_agent_has_a_send_tool_of_any_kind(): void
     {
         $registry = app(AgentRegistry::class);
@@ -99,8 +120,8 @@ class AgentRegistryTest extends TestCase
             $prompts[] = $prompt;
         }
 
-        // Three genuinely distinct prompts, not the same text three times.
-        $this->assertCount(3, array_unique($prompts));
+        // Four genuinely distinct prompts, not the same text repeated.
+        $this->assertCount(4, array_unique($prompts));
     }
 
     public function test_an_unknown_agent_identifier_is_rejected(): void
@@ -131,6 +152,8 @@ class AgentRegistryTest extends TestCase
         $this->assertSame([WorkflowType::DailyFollowUpReview], $registry->get(AgentIdentifier::Communication)->allowedWorkflows);
         $this->assertSame([WorkflowType::OpportunityAttentionReview], $registry->get(AgentIdentifier::Sales)->allowedWorkflows);
         $this->assertSame([WorkflowType::PerformanceExceptionReview], $registry->get(AgentIdentifier::Performance)->allowedWorkflows);
+        // Phase 12 adds no scheduled workflow.
+        $this->assertSame([], $registry->get(AgentIdentifier::CostToServe)->allowedWorkflows);
     }
 
     /**
@@ -169,5 +192,10 @@ class AgentRegistryTest extends TestCase
         $this->assertStringContainsString('FAQ', $communicationDescription);
         $this->assertStringContainsString('Reference', $communicationDescription);
         $this->assertStringNotContainsString('Product Guide', $communicationDescription);
+
+        $costToServeDescription = $registry->get(AgentIdentifier::CostToServe)->tools->find('search_knowledge')->definition()->description;
+        $this->assertStringContainsString('Policy', $costToServeDescription);
+        $this->assertStringNotContainsString('Sales Playbook', $costToServeDescription);
+        $this->assertStringNotContainsString('Training', $costToServeDescription);
     }
 }

@@ -47,7 +47,10 @@ class AssistantController extends Controller
         return view('assistant.show', [
             'conversation' => $request->session()->get(self::SESSION_KEY, []),
             'draft' => $request->session()->get(self::DRAFT_SESSION_KEY),
-            'agents' => AgentIdentifier::cases(),
+            // Phase 12: never offer an agent in the dropdown the actor
+            // isn't eligible for (Cost-to-Serve is Manager/Team-Head
+            // only) — server-side validation re-checks this regardless.
+            'agents' => array_values(array_filter(AgentIdentifier::cases(), fn (AgentIdentifier $agent) => $agent->isAvailableTo($request->user()))),
         ]);
     }
 
@@ -82,6 +85,18 @@ class AssistantController extends Controller
         }
 
         $agentId = $explicitAgent ?? $this->router->route($message);
+
+        // STEP 18 "routing is not security" holds: AgentRouter itself
+        // stays a pure topic classifier with no notion of the actor.
+        // Eligibility (Phase 12: Cost-to-Serve is Manager/Team-Head
+        // only) is applied here, once, as a deliberate fallback rather
+        // than ever handing an ineligible actor's auto-routed request
+        // to an agent they can't use — never a 403 for a message that
+        // merely happened to mention "cost to serve" in passing.
+        if (! $agentId->isAvailableTo($request->user())) {
+            $agentId = AgentIdentifier::Sales;
+        }
+
         $response = $this->assistant->respond($agentId, $request->user(), $message, $this->historyFor($conversation, $agentId));
 
         $conversation[] = [

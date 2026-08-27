@@ -102,4 +102,32 @@ return [
         'closing_soon_days' => env('WORKFLOW_CLOSING_SOON_DAYS', 7),
     ],
 
+    // ── Phase 12: Cost-to-Serve (revenue & engagement) intelligence ──
+    // No cost data exists anywhere in this application's schema (see
+    // docs/COST_TO_SERVE.md's data-availability matrix) — everything
+    // here is revenue/engagement-side only. Thresholds are deterministic
+    // application config, never left to the model to invent (STEP 11
+    // of the phase spec).
+    'cost_to_serve' => [
+        // Which Opportunity currency to aggregate — mirrors
+        // PerformanceService's own convention (STEP 8/Phase 4) of never
+        // summing mixed currencies.
+        'default_currency' => env('COST_TO_SERVE_DEFAULT_CURRENCY', 'USD'),
+        // An account's revenue this period vs. last period dropping by
+        // at least this percentage is flagged for review.
+        'revenue_decline_threshold_percent' => env('COST_TO_SERVE_REVENUE_DECLINE_THRESHOLD', 20.0),
+        // Sales-engagement touches (activities + communications) rising
+        // by at least this percentage while revenue does not rise is
+        // flagged — "more effort, no more return" is a legitimate
+        // signal from real data, distinct from any cost claim.
+        'engagement_growth_threshold_percent' => env('COST_TO_SERVE_ENGAGEMENT_GROWTH_THRESHOLD', 50.0),
+        // An account with zero closed revenue in the period but at
+        // least this many logged engagement touches is flagged.
+        'zero_revenue_engagement_threshold' => env('COST_TO_SERVE_ZERO_REVENUE_ENGAGEMENT_THRESHOLD', 5),
+        // How many top/flagged accounts a single tool call returns —
+        // keeps the LLM's context bounded regardless of dataset size
+        // (STEP 29).
+        'max_accounts_per_query' => env('COST_TO_SERVE_MAX_ACCOUNTS_PER_QUERY', 20),
+    ],
+
 ];
