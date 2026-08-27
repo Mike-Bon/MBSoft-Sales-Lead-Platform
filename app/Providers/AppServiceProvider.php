@@ -5,25 +5,28 @@ namespace App\Providers;
 use App\Contracts\Ai\LlmProvider;
 use App\Contracts\Communication\EmailProvider;
 use App\Contracts\Communication\WhatsAppProvider;
-use App\Services\Ai\Agent;
-use App\Services\Ai\CrmAssistantPrompt;
+use App\Enums\AgentIdentifier;
+use App\Enums\WorkflowType;
+use App\Services\Ai\AgentRegistry;
+use App\Services\Ai\Prompts\CommunicationAgentPrompt;
+use App\Services\Ai\Prompts\PerformanceAgentPrompt;
+use App\Services\Ai\Prompts\SalesAgentPrompt;
 use App\Services\Ai\Providers\AnthropicProvider;
 use App\Services\Ai\ToolRegistry;
 use App\Services\Ai\Tools\DraftEmailTool;
 use App\Services\Ai\Tools\DraftWhatsAppTool;
 use App\Services\Ai\Tools\GetCommunicationHistoryTool;
-use App\Services\Ai\Tools\GetContactTool;
 use App\Services\Ai\Tools\GetFollowupsTool;
 use App\Services\Ai\Tools\GetLeadTool;
 use App\Services\Ai\Tools\GetMyPerformanceTool;
 use App\Services\Ai\Tools\GetOpportunityTool;
 use App\Services\Ai\Tools\GetPipelineSummaryTool;
 use App\Services\Ai\Tools\GetTeamPerformanceTool;
-use App\Services\Ai\Tools\SearchContactsTool;
 use App\Services\Ai\Tools\SearchLeadsTool;
 use App\Services\Ai\Tools\SearchOpportunitiesTool;
 use App\Services\Communication\Providers\GmailEmailProvider;
 use App\Services\Communication\Providers\WhatsAppCloudApiProvider;
+use App\Support\Ai\AgentDefinition;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -39,38 +42,70 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(EmailProvider::class, GmailEmailProvider::class);
         $this->app->bind(WhatsAppProvider::class, WhatsAppCloudApiProvider::class);
 
-        // Phase 7 STEP 4: provider isolation for the AI layer, mirroring
-        // the pattern above exactly. Tests rebind LlmProvider to a fake,
-        // never touching Agent/AssistantService/any tool.
+        // Phase 7 STEP 4 / Phase 9 STEP 29: provider isolation for the
+        // AI layer. Every agent depends only on this interface — a
+        // future different provider needs one new class, never a
+        // rewrite of Agent, AgentRegistry, or any AgentTool.
         $this->app->bind(LlmProvider::class, AnthropicProvider::class);
 
-        // The one Phase 7 agent (STEP 6): a single configured Agent
-        // instance — this specific system prompt plus this specific
-        // tool list. A future second agent would be a second such
-        // binding elsewhere, reusing this exact Agent engine class with
-        // a different prompt/ToolRegistry — no orchestrator, no
-        // registry-of-agents, no agent-to-agent delegation.
-        $this->app->singleton(Agent::class, function ($app) {
-            return new Agent(
-                $app->make(LlmProvider::class),
-                new ToolRegistry([
-                    $app->make(SearchLeadsTool::class),
-                    $app->make(GetLeadTool::class),
-                    $app->make(SearchContactsTool::class),
-                    $app->make(GetContactTool::class),
-                    $app->make(SearchOpportunitiesTool::class),
-                    $app->make(GetOpportunityTool::class),
-                    $app->make(GetMyPerformanceTool::class),
-                    $app->make(GetTeamPerformanceTool::class),
-                    $app->make(GetPipelineSummaryTool::class),
-                    $app->make(GetFollowupsTool::class),
-                    $app->make(GetCommunicationHistoryTool::class),
-                    $app->make(DraftEmailTool::class),
-                    $app->make(DraftWhatsAppTool::class),
-                ]),
-                CrmAssistantPrompt::text(),
-                (int) config('services.ai.max_tool_iterations', 6),
-            );
+        // Phase 9 STEP 6/24: the three approved specialized agents and
+        // their explicit tool permission matrix — no agent receives a
+        // tool it isn't listed here. App\Services\Ai\Agent (the engine)
+        // is unchanged from Phase 7; every agent below is just a
+        // differently-configured instance of the same generic engine,
+        // constructed on demand by AssistantService from the
+        // AgentDefinition the router/user selected.
+        $this->app->singleton(AgentRegistry::class, function ($app) {
+            $maxIterations = (int) config('services.ai.max_tool_iterations', 6);
+
+            return new AgentRegistry([
+                new AgentDefinition(
+                    identifier: AgentIdentifier::Sales,
+                    name: AgentIdentifier::Sales->label(),
+                    purpose: 'Pipeline, lead, and opportunity intelligence.',
+                    systemPrompt: SalesAgentPrompt::text(),
+                    tools: new ToolRegistry([
+                        $app->make(SearchLeadsTool::class),
+                        $app->make(GetLeadTool::class),
+                        $app->make(SearchOpportunitiesTool::class),
+                        $app->make(GetOpportunityTool::class),
+                        $app->make(GetFollowupsTool::class),
+                        $app->make(GetCommunicationHistoryTool::class),
+                        $app->make(GetPipelineSummaryTool::class),
+                    ]),
+                    allowedWorkflows: [WorkflowType::OpportunityAttentionReview],
+                    maxToolIterations: $maxIterations,
+                ),
+                new AgentDefinition(
+                    identifier: AgentIdentifier::Performance,
+                    name: AgentIdentifier::Performance->label(),
+                    purpose: 'Target/achievement/gap/pipeline-coverage interpretation.',
+                    systemPrompt: PerformanceAgentPrompt::text(),
+                    tools: new ToolRegistry([
+                        $app->make(GetMyPerformanceTool::class),
+                        $app->make(GetTeamPerformanceTool::class),
+                        $app->make(GetPipelineSummaryTool::class),
+                    ]),
+                    allowedWorkflows: [WorkflowType::PerformanceExceptionReview],
+                    maxToolIterations: $maxIterations,
+                ),
+                new AgentDefinition(
+                    identifier: AgentIdentifier::Communication,
+                    name: AgentIdentifier::Communication->label(),
+                    purpose: 'Follow-up recommendations and draft-only communication.',
+                    systemPrompt: CommunicationAgentPrompt::text(),
+                    tools: new ToolRegistry([
+                        $app->make(GetFollowupsTool::class),
+                        $app->make(GetCommunicationHistoryTool::class),
+                        $app->make(GetLeadTool::class),
+                        $app->make(GetOpportunityTool::class),
+                        $app->make(DraftEmailTool::class),
+                        $app->make(DraftWhatsAppTool::class),
+                    ]),
+                    allowedWorkflows: [WorkflowType::DailyFollowUpReview],
+                    maxToolIterations: $maxIterations,
+                ),
+            ]);
         });
     }
 

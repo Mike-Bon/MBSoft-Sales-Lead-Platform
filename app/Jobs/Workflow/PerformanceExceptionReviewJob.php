@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Workflow;
 
+use App\Enums\AgentIdentifier;
 use App\Enums\WorkflowType;
 use App\Models\User;
 use App\Services\Workflow\Analyzers\PerformanceExceptionAnalyzer;
@@ -14,9 +15,10 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * STEP 8/13: see DailyFollowUpReviewJob's docblock. Every number in the
- * analysis comes from PerformanceService — the agent explains them, it
- * never recalculates them (STEP 8/38).
+ * STEP 8/13/44: see DailyFollowUpReviewJob's docblock. Every number in
+ * the analysis comes from PerformanceService — the agent explains them,
+ * it never recalculates them (STEP 8/38). Uses the Performance &
+ * Management Agent (STEP 44's explicit mapping).
  */
 class PerformanceExceptionReviewJob implements ShouldQueue
 {
@@ -46,9 +48,10 @@ class PerformanceExceptionReviewJob implements ShouldQueue
 
         $executor->run(
             WorkflowType::PerformanceExceptionReview,
+            AgentIdentifier::Performance,
             $scope,
             $analysis,
-            'Explain the performance exceptions listed below in a short, concise summary — every number is already calculated and authoritative; do not recompute or adjust any of them. Do not prepare a draft for this workflow.',
+            'Explain the performance exceptions listed below in a short, concise summary — every number is already calculated and authoritative; do not recompute or adjust any of them.',
         );
     }
 }

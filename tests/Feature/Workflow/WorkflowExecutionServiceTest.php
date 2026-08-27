@@ -3,6 +3,7 @@
 namespace Tests\Feature\Workflow;
 
 use App\Contracts\Ai\LlmProvider;
+use App\Enums\AgentIdentifier;
 use App\Enums\ApprovalStatus;
 use App\Enums\WorkflowStatus;
 use App\Enums\WorkflowType;
@@ -11,7 +12,6 @@ use App\Models\EmailAccount;
 use App\Models\User;
 use App\Models\WorkflowApproval;
 use App\Models\WorkflowExecution;
-use App\Services\Ai\Agent;
 use App\Services\Workflow\WorkflowExecutionService;
 use App\Support\Ai\AiCompletionResult;
 use App\Support\Ai\AiProviderException;
@@ -25,7 +25,10 @@ use Tests\TestCase;
  * STEP 3/12/13: the orchestrator's own responsibilities, independent of
  * any specific workflow's analyzer — idempotency, cost-control skip,
  * audit linkage, draft-to-approval conversion, and safe failure
- * handling.
+ * handling. Since Phase 9, run() also takes an AgentIdentifier — these
+ * tests use Communication (the same agent DailyFollowUpReviewJob
+ * actually uses, STEP 44) except where a test is specifically about
+ * behaviour that doesn't depend on which agent was chosen.
  */
 class WorkflowExecutionServiceTest extends TestCase
 {
@@ -34,7 +37,6 @@ class WorkflowExecutionServiceTest extends TestCase
     private function fake(FakeLlmProvider $provider): void
     {
         $this->app->instance(LlmProvider::class, $provider);
-        $this->app->forgetInstance(Agent::class);
     }
 
     public function test_no_findings_skips_the_agent_entirely_and_records_a_deterministic_result(): void
@@ -45,6 +47,7 @@ class WorkflowExecutionServiceTest extends TestCase
         $user = User::factory()->create();
         $execution = app(WorkflowExecutionService::class)->run(
             WorkflowType::DailyFollowUpReview,
+            AgentIdentifier::Communication,
             WorkflowScope::forUser($user),
             new AnalysisResult(false, [], 'No overdue follow-ups today.'),
             'task',
@@ -64,6 +67,7 @@ class WorkflowExecutionServiceTest extends TestCase
         $user = User::factory()->create();
         $execution = app(WorkflowExecutionService::class)->run(
             WorkflowType::DailyFollowUpReview,
+            AgentIdentifier::Communication,
             WorkflowScope::forUser($user),
             new AnalysisResult(true, ['overdue_count' => 3], ''),
             'task',
@@ -72,6 +76,7 @@ class WorkflowExecutionServiceTest extends TestCase
         $this->assertSame(WorkflowStatus::Completed, $execution->status);
         $this->assertSame('Prioritize ABC Manufacturing first.', $execution->result);
         $this->assertNotNull($execution->agent_interaction_id);
+        $this->assertSame('communication', $execution->agentInteraction->agent);
         $this->assertCount(1, $provider->calls);
     }
 
@@ -83,6 +88,7 @@ class WorkflowExecutionServiceTest extends TestCase
         $user = User::factory()->create();
         app(WorkflowExecutionService::class)->run(
             WorkflowType::DailyFollowUpReview,
+            AgentIdentifier::Communication,
             WorkflowScope::forUser($user),
             new AnalysisResult(true, ['overdue_count' => 1], ''),
             'Identify priorities.',
@@ -106,8 +112,8 @@ class WorkflowExecutionServiceTest extends TestCase
         $scope = WorkflowScope::forUser($user);
         $analysis = new AnalysisResult(true, ['x' => 1], '');
 
-        $first = app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, $scope, $analysis, 'task');
-        $second = app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, $scope, $analysis, 'task');
+        $first = app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, AgentIdentifier::Communication, $scope, $analysis, 'task');
+        $second = app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, AgentIdentifier::Communication, $scope, $analysis, 'task');
 
         $this->assertSame($first->id, $second->id);
         $this->assertSame(1, WorkflowExecution::count());
@@ -123,8 +129,8 @@ class WorkflowExecutionServiceTest extends TestCase
         $scope = WorkflowScope::forUser($user);
         $analysis = new AnalysisResult(true, ['x' => 1], '');
 
-        app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, $scope, $analysis, 'task');
-        app(WorkflowExecutionService::class)->run(WorkflowType::OpportunityAttentionReview, $scope, $analysis, 'task');
+        app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, AgentIdentifier::Communication, $scope, $analysis, 'task');
+        app(WorkflowExecutionService::class)->run(WorkflowType::OpportunityAttentionReview, AgentIdentifier::Sales, $scope, $analysis, 'task');
 
         $this->assertSame(2, WorkflowExecution::count());
     }
@@ -139,11 +145,11 @@ class WorkflowExecutionServiceTest extends TestCase
             }
         };
         $this->app->instance(LlmProvider::class, $failing);
-        $this->app->forgetInstance(Agent::class);
 
         $user = User::factory()->create();
         $execution = app(WorkflowExecutionService::class)->run(
             WorkflowType::DailyFollowUpReview,
+            AgentIdentifier::Communication,
             WorkflowScope::forUser($user),
             new AnalysisResult(true, ['x' => 1], ''),
             'task',
@@ -168,6 +174,7 @@ class WorkflowExecutionServiceTest extends TestCase
 
         $execution = app(WorkflowExecutionService::class)->run(
             WorkflowType::DailyFollowUpReview,
+            AgentIdentifier::Communication,
             WorkflowScope::forUser($user),
             new AnalysisResult(true, ['leads' => [['contact_id' => $contact->id]]], ''),
             'task',
@@ -180,5 +187,29 @@ class WorkflowExecutionServiceTest extends TestCase
         $this->assertSame(ApprovalStatus::Pending, $approval->status);
         $this->assertNotNull($approval->expires_at);
         $this->assertDatabaseCount('communications', 0);
+    }
+
+    public function test_the_agent_must_actually_have_the_tool_the_task_asks_it_to_use(): void
+    {
+        // STEP 24/44: the Performance Agent has no draft tools — if
+        // asked to draft, the model could only ever hit "unknown tool",
+        // never actually produce one. Confirms the tool permission
+        // matrix is real, not just documented.
+        $user = User::factory()->create();
+        $provider = new FakeLlmProvider([
+            FakeLlmProvider::toolCall('draft_email', ['recipient' => 'x@example.test', 'body' => 'Hi']),
+            FakeLlmProvider::text('I do not have a way to draft a message.'),
+        ]);
+        $this->fake($provider);
+
+        app(WorkflowExecutionService::class)->run(
+            WorkflowType::PerformanceExceptionReview,
+            AgentIdentifier::Performance,
+            WorkflowScope::forUser($user),
+            new AnalysisResult(true, ['exceptions' => []], ''),
+            'task',
+        );
+
+        $this->assertDatabaseCount('workflow_approvals', 0);
     }
 }

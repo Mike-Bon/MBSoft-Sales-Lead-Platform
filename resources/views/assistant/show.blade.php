@@ -26,6 +26,10 @@
                     </div>
                 @else
                     <div class="max-w-lg rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-700">
+                        @if (! empty($turn['agent_label']))
+                            <div class="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ $turn['agent_label'] }}</div>
+                        @endif
+
                         @if (! empty($turn['tools_used']))
                             <div class="mb-2 flex flex-wrap gap-1">
                                 @foreach (array_unique($turn['tools_used']) as $toolName)
@@ -116,6 +120,15 @@
 
         <form method="POST" action="{{ route('assistant.send-message') }}" class="space-y-3">
             @csrf
+            <flux:select name="agent" label="Ask" placeholder="Auto — let the assistant pick">
+                @foreach ($agents as $agentOption)
+                    <flux:select.option value="{{ $agentOption->value }}" :selected="old('agent') === $agentOption->value">{{ $agentOption->label() }}</flux:select.option>
+                @endforeach
+            </flux:select>
+            @error('agent')
+                <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+            @enderror
+
             <flux:textarea name="message" rows="3" placeholder="Ask about your leads, opportunities, performance, or ask for a draft..." required>{{ old('message') }}</flux:textarea>
             @error('message')
                 <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>

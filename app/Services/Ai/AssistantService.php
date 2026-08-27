@@ -2,6 +2,8 @@
 
 namespace App\Services\Ai;
 
+use App\Contracts\Ai\LlmProvider;
+use App\Enums\AgentIdentifier;
 use App\Enums\AgentInteractionStatus;
 use App\Models\AgentInteraction;
 use App\Models\User;
@@ -12,31 +14,45 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
- * The thin binding between the HTTP layer and the one Phase 7 agent:
- * calls Agent::respond(), records an AgentInteraction audit row (STEP
- * 35) for every call, and guarantees STEP 28 — the CRM must remain
- * fully functional when the AI provider is unavailable — by catching
- * AiProviderException here rather than letting it reach the controller
- * as an uncaught exception.
+ * STEP 45 backward compatibility: this is Phase 7's exact
+ * AssistantService, evolved (as CLAUDE.md/the spec directs) into the
+ * general entry layer that invokes one of the three Phase 9 specialized
+ * agents rather than always the one Phase 7 general agent. Its callers
+ * (AssistantController, WorkflowExecutionService) now say WHICH agent to
+ * use; everything else about its contract — audit recording,
+ * AiProviderException → safe-failure handling (STEP 28), never throwing
+ * to the caller — is unchanged.
+ *
+ * A fresh App\Services\Ai\Agent (the generic engine, itself completely
+ * unmodified since Phase 7) is constructed per call from the requested
+ * AgentDefinition's own tools/prompt/limits — cheap (no I/O), and it
+ * guarantees one agent's configuration can never leak into another
+ * agent's call.
  */
 class AssistantService
 {
-    public function __construct(private readonly Agent $agent) {}
+    public function __construct(
+        private readonly AgentRegistry $agents,
+        private readonly LlmProvider $provider,
+    ) {}
 
     /**
      * @param  array<int, array<string, mixed>>  $history
      */
-    public function respond(User $actor, string $message, array $history = []): AgentResponse
+    public function respond(AgentIdentifier $agentId, User $actor, string $message, array $history = []): AgentResponse
     {
+        $definition = $this->agents->get($agentId);
+        $agent = new Agent($this->provider, $definition->tools, $definition->systemPrompt, $definition->maxToolIterations);
+
         $startedAt = now();
 
         try {
-            $response = $this->agent->respond($actor, $message, $history);
-            $this->record($actor, $message, $response, $startedAt, null);
+            $response = $agent->respond($actor, $message, $history);
+            $this->record($agentId, $actor, $message, $response, $startedAt, null);
 
             return $response;
         } catch (AiProviderException $e) {
-            Log::error('AI assistant provider failure', ['exception' => $e->getMessage()]);
+            Log::error('AI assistant provider failure', ['agent' => $agentId->value, 'exception' => $e->getMessage()]);
 
             $response = new AgentResponse(
                 AgentInteractionStatus::Failed,
@@ -46,17 +62,17 @@ class AssistantService
                 ['input_tokens' => 0, 'output_tokens' => 0],
             );
 
-            $this->record($actor, $message, $response, $startedAt, 'AI provider unavailable.');
+            $this->record($agentId, $actor, $message, $response, $startedAt, 'AI provider unavailable.');
 
             return $response;
         }
     }
 
-    private function record(User $actor, string $message, AgentResponse $response, Carbon $startedAt, ?string $errorSummary): void
+    private function record(AgentIdentifier $agentId, User $actor, string $message, AgentResponse $response, Carbon $startedAt, ?string $errorSummary): void
     {
         $interaction = new AgentInteraction;
         $interaction->user_id = $actor->id;
-        $interaction->agent = 'crm-assistant';
+        $interaction->agent = $agentId->value;
         $interaction->provider = 'anthropic';
         $interaction->model = (string) config('services.anthropic.model');
         $interaction->status = $response->status;

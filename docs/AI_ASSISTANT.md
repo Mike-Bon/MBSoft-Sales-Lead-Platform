@@ -1,5 +1,17 @@
 # AI Assistant (Phase 7)
 
+> **Superseded by Phase 9.** The single-agent architecture this document
+> describes (one `Agent` engine instance bound directly in
+> `AppServiceProvider`, driven by a single `CrmAssistantPrompt`) has been
+> replaced by three specialized agents sharing the same underlying
+> engine — see **docs/MULTI_AGENT.md** for the current architecture.
+> Everything below about the `Agent` engine itself, `LlmProvider`, the
+> 13 tools, the draft/approval flow, and every non-negotiable safety
+> boundary remains accurate and fully reused; only the "one agent" /
+> `AppServiceProvider` wiring section immediately below is now
+> historical — kept for context on why the engine was built generic
+> from day one.
+
 This document is the authoritative reference for the constrained AI agent
 introduced in Phase 7. If this document and the code ever disagree, the
 code is a bug against this document, not the other way around.

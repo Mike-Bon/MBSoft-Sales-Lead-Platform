@@ -12,7 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\WhatsAppBusinessNumber;
 use App\Services\Ai\Agent;
-use App\Services\Ai\CrmAssistantPrompt;
+use App\Services\Ai\Prompts\SalesAgentPrompt;
 use App\Services\Ai\ToolRegistry;
 use App\Services\Ai\Tools\DraftWhatsAppTool;
 use App\Services\Ai\Tools\GetFollowupsTool;
@@ -174,6 +174,6 @@ class EvaluationSuiteTest extends TestCase
      */
     private function agentWith(FakeLlmProvider $provider, array $tools): Agent
     {
-        return new Agent($provider, new ToolRegistry($tools), CrmAssistantPrompt::text());
+        return new Agent($provider, new ToolRegistry($tools), SalesAgentPrompt::text());
     }
 }

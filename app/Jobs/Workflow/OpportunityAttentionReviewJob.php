@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Workflow;
 
+use App\Enums\AgentIdentifier;
 use App\Enums\WorkflowType;
 use App\Models\User;
 use App\Services\Workflow\Analyzers\OpportunityAttentionAnalyzer;
@@ -14,10 +15,11 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * STEP 7/11: see DailyFollowUpReviewJob's docblock — same pattern,
+ * STEP 7/11/44: see DailyFollowUpReviewJob's docblock — same pattern,
  * different analyzer. The analyzer never predicts an outcome (STEP 7);
  * it only reports deterministic signals (closing soon, no recent
- * activity, missing expected close date).
+ * activity, missing expected close date). Uses the Sales Intelligence
+ * Agent (STEP 44's explicit mapping).
  */
 class OpportunityAttentionReviewJob implements ShouldQueue
 {
@@ -51,9 +53,10 @@ class OpportunityAttentionReviewJob implements ShouldQueue
 
         $executor->run(
             WorkflowType::OpportunityAttentionReview,
+            AgentIdentifier::Sales,
             $scope,
             $analysis,
-            'Identify which open opportunities most need attention and explain why, using only the signals provided (closing soon, no recent activity, missing expected close date). Use language like "needs attention" or "potential risk" — never claim an opportunity will definitely close or fail. Do not prepare a draft unless specifically warranted.',
+            'Identify which open opportunities most need attention and explain why, using only the signals provided (closing soon, no recent activity, missing expected close date). Use language like "needs attention" or "potential risk" — never claim an opportunity will definitely close or fail.',
         );
     }
 }

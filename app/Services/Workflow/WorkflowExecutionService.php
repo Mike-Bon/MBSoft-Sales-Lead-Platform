@@ -2,6 +2,7 @@
 
 namespace App\Services\Workflow;
 
+use App\Enums\AgentIdentifier;
 use App\Enums\AgentInteractionStatus;
 use App\Enums\WorkflowStatus;
 use App\Enums\WorkflowType;
@@ -16,21 +17,26 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * STEP 3/13: the central orchestrator every Phase 8 workflow job calls.
- * Reuses AssistantService::respond() verbatim — the exact same Phase 7
- * Agent, ToolRegistry, LlmProvider, and AgentInteraction audit model,
- * never a second, parallel AI pipeline. This class's only Phase-8-
- * specific responsibilities are: idempotent execution recording (STEP
- * 12), skipping the agent entirely when deterministic analysis found
- * nothing (STEP 36 cost control), and turning a produced draft into a
- * persisted WorkflowApproval (STEP 19/20) rather than an ephemeral
- * session draft.
+ * STEP 3/13/44: the central orchestrator every Phase 8 workflow job
+ * calls. Reuses AssistantService::respond() verbatim — the exact same
+ * Phase 9 Agent engine, ToolRegistry, LlmProvider, and AgentInteraction
+ * audit model, never a second, parallel AI pipeline. Since Phase 9, the
+ * caller specifies WHICH of the three specialized agents this workflow
+ * uses (STEP 44's explicit mapping: Daily Follow-Up Review →
+ * Communication Agent, Opportunity Attention Review → Sales Agent,
+ * Performance Exception Review → Performance Agent) — this class itself
+ * has no opinion on that mapping, it only executes whichever agent it's
+ * told to. This class's own responsibilities remain: idempotent
+ * execution recording (STEP 12), skipping the agent entirely when
+ * deterministic analysis found nothing (STEP 36 cost control), and
+ * turning a produced draft into a persisted WorkflowApproval (STEP
+ * 19/20) rather than an ephemeral session draft.
  */
 class WorkflowExecutionService
 {
     public function __construct(private readonly AssistantService $assistant) {}
 
-    public function run(WorkflowType $type, WorkflowScope $scope, AnalysisResult $analysis, string $task, string $trigger = 'scheduled'): WorkflowExecution
+    public function run(WorkflowType $type, AgentIdentifier $agentId, WorkflowScope $scope, AnalysisResult $analysis, string $task, string $trigger = 'scheduled'): WorkflowExecution
     {
         $executionKey = $scope->executionKey($type->value);
 
@@ -70,18 +76,18 @@ class WorkflowExecutionService
             return $execution;
         }
 
-        $this->completeWithAgent($execution, $type, $scope, $analysis, $task);
+        $this->completeWithAgent($execution, $type, $agentId, $scope, $analysis, $task);
 
         return $execution;
     }
 
-    private function completeWithAgent(WorkflowExecution $execution, WorkflowType $type, WorkflowScope $scope, AnalysisResult $analysis, string $task): void
+    private function completeWithAgent(WorkflowExecution $execution, WorkflowType $type, AgentIdentifier $agentId, WorkflowScope $scope, AnalysisResult $analysis, string $task): void
     {
         $message = WorkflowPromptBuilder::build($type, $task, $analysis->findings);
         $lastInteractionIdBefore = (int) (AgentInteraction::max('id') ?? 0);
 
         try {
-            $response = $this->assistant->respond($scope->subject, $message, []);
+            $response = $this->assistant->respond($agentId, $scope->subject, $message, []);
         } catch (\Throwable $e) {
             Log::error('Workflow execution failed', ['workflow' => $type->value, 'execution_id' => $execution->id, 'exception' => $e->getMessage()]);
             $execution->status = WorkflowStatus::Failed;

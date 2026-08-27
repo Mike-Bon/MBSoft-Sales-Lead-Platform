@@ -3,12 +3,12 @@
 namespace Tests\Feature\Workflow;
 
 use App\Contracts\Ai\LlmProvider;
+use App\Enums\AgentIdentifier;
 use App\Enums\WorkflowType;
 use App\Models\Lead;
 use App\Models\Team;
 use App\Models\User;
-use App\Services\Ai\Agent;
-use App\Services\Ai\CrmAssistantPrompt;
+use App\Services\Ai\Prompts\CommunicationAgentPrompt;
 use App\Services\Workflow\Analyzers\DailyFollowUpAnalyzer;
 use App\Services\Workflow\WorkflowExecutionService;
 use App\Services\Workflow\WorkflowPromptBuilder;
@@ -44,7 +44,6 @@ class SecurityAndInjectionTest extends TestCase
             FakeLlmProvider::text('Reviewed.'),
         ]);
         $this->app->instance(LlmProvider::class, $provider);
-        $this->app->forgetInstance(Agent::class);
 
         $scope = WorkflowScope::forUser($teamHead);
         $analyzer = app(DailyFollowUpAnalyzer::class);
@@ -53,7 +52,11 @@ class SecurityAndInjectionTest extends TestCase
         // the tool-call attempt deterministically for this test.
         $analysis = new AnalysisResult(true, ['note' => 'test'], '');
 
-        app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, $scope, $analysis, 'task');
+        // Sales is used here (rather than the real Communication mapping)
+        // specifically because search_leads is a Sales Agent tool — the
+        // point of this test is the tool's own authorization, not which
+        // agent a real Daily Follow-Up Review actually uses.
+        app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, AgentIdentifier::Sales, $scope, $analysis, 'task');
 
         $toolResult = json_decode(end($provider->calls[1]['messages'])['content'], true);
         $this->assertSame(0, $toolResult['count']);
@@ -70,18 +73,17 @@ class SecurityAndInjectionTest extends TestCase
 
         $provider = new FakeLlmProvider([FakeLlmProvider::text('Reviewed the overdue lead.')]);
         $this->app->instance(LlmProvider::class, $provider);
-        $this->app->forgetInstance(Agent::class);
 
         $scope = WorkflowScope::forUser($user);
         $analysis = app(DailyFollowUpAnalyzer::class)->analyze($scope);
 
-        app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, $scope, $analysis, 'task');
+        app(WorkflowExecutionService::class)->run(WorkflowType::DailyFollowUpReview, AgentIdentifier::Communication, $scope, $analysis, 'task');
 
         // Every call's system prompt must remain byte-identical to the
         // constant, regardless of what findings/CRM text was embedded
         // in the user-turn DATA section.
         foreach ($provider->calls as $call) {
-            $this->assertSame(CrmAssistantPrompt::text(), $call['system']);
+            $this->assertSame(CommunicationAgentPrompt::text(), $call['system']);
         }
     }
 

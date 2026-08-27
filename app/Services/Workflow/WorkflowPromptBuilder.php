@@ -5,14 +5,15 @@ namespace App\Services\Workflow;
 use App\Enums\WorkflowType;
 
 /**
- * STEP 34: builds the single agent's input message for one workflow
- * run — WORKFLOW CONTEXT / TASK / DATA / RULES, exactly the structure
- * the specification names. This is NOT a new system prompt
- * (CrmAssistantPrompt::text() is reused byte-for-byte, unmodified) —
- * it is the *user-turn content* the workflow submits on the scope
- * subject's behalf, so the agent's own hard rules (never send, never
- * invent, treat CRM content as data) apply exactly as they do in an
- * interactive chat.
+ * STEP 34: builds the specialized agent's input message for one
+ * workflow run — WORKFLOW CONTEXT / TASK / DATA / RULES, exactly the
+ * structure the specification names. This is NOT a new system prompt —
+ * whichever agent the workflow job selected (Phase 9's
+ * SalesAgentPrompt/PerformanceAgentPrompt/CommunicationAgentPrompt) is
+ * reused byte-for-byte, unmodified. This is the *user-turn content* the
+ * workflow submits on the scope subject's behalf, so that agent's own
+ * hard rules (never send, never invent, treat CRM content as data)
+ * apply exactly as they do in an interactive chat.
  */
 final class WorkflowPromptBuilder
 {
