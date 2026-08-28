@@ -5,7 +5,7 @@
 #
 #   cd ~/domains/mbsoft.online/public_html/app
 #   git clone https://github.com/Mike-Bon/MBSoft-Sales-Lead-Platform.git .
-#   git checkout v1.0.1        # or the tag you are deploying
+#   git checkout v1.0.2        # or the tag you are deploying
 #   bash deploy/first-deploy.sh
 #
 # It does: composer install, writes .env (prompts for the DB password),
@@ -15,6 +15,11 @@
 # It does NOT: create the subdomain, set the PHP version, set the document
 # root, or add the cron jobs — those are 4 clicks in hPanel and the script
 # prints exactly what to enter at the end.
+#
+# Hostinger shared hosting disables proc_open() system-wide. The script
+# detects that and (a) installs with --no-scripts + runs package:discover
+# directly, (b) prints a cron that calls the workflow command directly
+# instead of `schedule:run` (which needs proc_open).
 #
 set -euo pipefail
 
@@ -33,6 +38,15 @@ for c in php8.3 php8.2 php /usr/bin/php8.3 /usr/bin/php8.2 /opt/alt/php83/usr/bi
 done
 [ -n "$PHP" ] || { echo "ERROR: no PHP >= 8.2 CLI found. Set PHP 8.3 in hPanel -> PHP Configuration, then re-run."; exit 1; }
 echo "==> PHP: $PHP ($($PHP -r 'echo PHP_VERSION;'))"
+
+# proc_open is disabled on Hostinger shared hosting — detect it.
+if $PHP -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then
+    HAS_PROC_OPEN=1
+    echo "==> proc_open: available"
+else
+    HAS_PROC_OPEN=0
+    echo "==> proc_open: DISABLED (shared hosting) — using --no-scripts + direct package:discover"
+fi
 
 # ---------------------------------------------------------------------------
 # 2. Locate Composer
@@ -54,7 +68,13 @@ echo "==> Composer: $COMPOSER"
 # 3. Install PHP dependencies (production)
 # ---------------------------------------------------------------------------
 echo "==> composer install --no-dev ..."
-COMPOSER_MEMORY_LIMIT=-1 $COMPOSER install --no-dev --optimize-autoloader --no-interaction
+if [ "$HAS_PROC_OPEN" -eq 1 ]; then
+    COMPOSER_MEMORY_LIMIT=-1 $COMPOSER install --no-dev --optimize-autoloader --no-interaction
+else
+    COMPOSER_MEMORY_LIMIT=-1 $COMPOSER install --no-dev --optimize-autoloader --no-interaction --no-scripts
+    echo "==> Running post-install artisan step directly ..."
+    $PHP artisan package:discover --ansi
+fi
 
 # ---------------------------------------------------------------------------
 # 4. .env
@@ -176,12 +196,15 @@ echo "==> Checking database connection & pending migrations ..."
 $PHP artisan migrate:status
 echo
 read -r -p "Run 'php artisan migrate --force' now? [y/N]: " RUNMIG
-if [ "${RUNMIG,,}" = "y" ]; then
-    $PHP artisan migrate --force
-    $PHP artisan migrate:status | tail -5
-else
-    echo "==> Skipped. Run '$PHP artisan migrate --force' yourself before going live."
-fi
+case "$RUNMIG" in
+    y|Y|yes|YES)
+        $PHP artisan migrate --force
+        $PHP artisan migrate:status | tail -5
+        ;;
+    *)
+        echo "==> Skipped. Run '$PHP artisan migrate --force' yourself before going live."
+        ;;
+esac
 
 # ---------------------------------------------------------------------------
 # 7. Caches + permissions
@@ -197,11 +220,12 @@ echo "==> Permissions set."
 # ---------------------------------------------------------------------------
 echo
 read -r -p "Create the first Manager account now? [y/N]: " MKMGR
-if [ "${MKMGR,,}" = "y" ]; then
-    read -r -p "  Manager full name: " MGR_NAME
-    read -r -p "  Manager email: " MGR_EMAIL
-    read -r -s -p "  Manager password: " MGR_PASS; echo
-    MGR_NAME="$MGR_NAME" MGR_EMAIL="$MGR_EMAIL" MGR_PASS="$MGR_PASS" $PHP artisan tinker <<'PHP'
+case "$MKMGR" in
+    y|Y|yes|YES)
+        read -r -p "  Manager full name: " MGR_NAME
+        read -r -p "  Manager email: " MGR_EMAIL
+        read -r -s -p "  Manager password: " MGR_PASS; echo
+        MGR_NAME="$MGR_NAME" MGR_EMAIL="$MGR_EMAIL" MGR_PASS="$MGR_PASS" $PHP artisan tinker --no-interaction <<'PHP'
 $email = getenv('MGR_EMAIL');
 if (App\Models\User::where('email', $email)->exists()) {
     echo "A user with that email already exists — skipped.\n";
@@ -216,12 +240,18 @@ if (App\Models\User::where('email', $email)->exists()) {
     echo "Created Manager #{$u->id} ({$u->email}).\n";
 }
 PHP
-fi
+        ;;
+esac
 
 # ---------------------------------------------------------------------------
 # 9. What you still have to do in hPanel
 # ---------------------------------------------------------------------------
-CRON_DIR="$APP_DIR"
+if [ "$HAS_PROC_OPEN" -eq 1 ]; then
+    SCHED_CRON="* * * * *  cd ${APP_DIR} && ${PHP} artisan schedule:run >> /dev/null 2>&1"
+else
+    SCHED_CRON="0 8 * * *  cd ${APP_DIR} && ${PHP} artisan workflows:run-daily >> storage/logs/workflows.log 2>&1"
+fi
+
 cat <<DONE
 
 ============================================================
@@ -231,11 +261,13 @@ cat <<DONE
 1) Subdomains -> app.mbsoft.online -> Document Root:
       ${APP_DIR}/public
 
-2) Advanced -> Cron Jobs -> add BOTH (every minute):
+2) Advanced -> Cron Jobs -> add BOTH:
 
-   cd ${CRON_DIR} && ${PHP} artisan schedule:run >> /dev/null 2>&1
+   # daily agentic workflow
+   ${SCHED_CRON}
 
-   cd ${CRON_DIR} && ${PHP} artisan queue:work --stop-when-empty --max-time=55 --tries=3 >> storage/logs/worker.log 2>&1
+   # queue worker (every minute; drains the queue then exits)
+   * * * * *  cd ${APP_DIR} && ${PHP} artisan queue:work --stop-when-empty --max-time=55 --tries=3 >> storage/logs/worker.log 2>&1
 
 3) Security -> SSL -> ensure SSL is active for app.mbsoft.online and
    "Force HTTPS" is on.

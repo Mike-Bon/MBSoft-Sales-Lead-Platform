@@ -59,9 +59,16 @@ bash deploy/redeploy.sh v1.0.2
 - **`config:cache` and `route:cache` are skipped on purpose** — this app
   reads `env('TRUSTED_PROXIES')` in `bootstrap/app.php`, and the `/`
   route is a closure. `view:cache` + `event:cache` are used.
+- **`proc_open()` is disabled on Hostinger shared hosting** (system-wide,
+  not user-configurable). The scripts detect this and: install Composer
+  deps with `--no-scripts` then run `artisan package:discover` directly;
+  and the cron for the daily workflow calls `artisan workflows:run-daily`
+  directly instead of `artisan schedule:run` (which needs `proc_open`).
+  The application's own runtime code never uses `proc_open`.
 - **Queue** — no persistent worker on shared hosting; the 1‑minute cron
-  drains the queue each run (≤ 60 s latency). Move to a VPS + Supervisor
-  if volume grows (`docs/DEPLOYMENT.md` §4).
+  drains the queue each run (≤ 60 s latency). `queue:work` does not need
+  `proc_open`. Move to a VPS + Supervisor if volume grows
+  (`docs/DEPLOYMENT.md` §4).
 - **Supabase** — connect via the **Session pooler**
   (`aws-0-<region>.pooler.supabase.com:5432`), not the direct
   `db.<ref>.supabase.co` host (IPv6‑only). The script defaults to the

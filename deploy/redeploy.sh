@@ -22,6 +22,8 @@ done
 
 if command -v composer >/dev/null 2>&1; then COMPOSER="composer"; else COMPOSER="$PHP composer.phar"; fi
 
+if $PHP -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then NOSCRIPTS=""; else NOSCRIPTS="--no-scripts"; fi
+
 echo "==> Maintenance mode on"
 $PHP artisan down --retry=15 || true
 
@@ -29,8 +31,9 @@ echo "==> Fetching $TARGET"
 git fetch --tags --prune
 git checkout "$TARGET"
 
-echo "==> composer install --no-dev"
-COMPOSER_MEMORY_LIMIT=-1 $COMPOSER install --no-dev --optimize-autoloader --no-interaction
+echo "==> composer install --no-dev $NOSCRIPTS"
+COMPOSER_MEMORY_LIMIT=-1 $COMPOSER install --no-dev --optimize-autoloader --no-interaction $NOSCRIPTS
+[ -n "$NOSCRIPTS" ] && $PHP artisan package:discover --ansi
 
 echo "==> Migrations"
 $PHP artisan migrate --force
