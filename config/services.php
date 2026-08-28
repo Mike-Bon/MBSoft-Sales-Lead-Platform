@@ -130,4 +130,52 @@ return [
         'max_accounts_per_query' => env('COST_TO_SERVE_MAX_ACCOUNTS_PER_QUERY', 20),
     ],
 
+    // ── Phase 13: Business Development Intelligence ──────────────────
+    // Transparent prospecting/account-development analysis over data
+    // that already exists (leads, opportunities, activities, follow-up
+    // dates). Every threshold and every prioritisation weight is
+    // deterministic application config here — never decided by the
+    // model, and every score the tools return is explained factor by
+    // factor (spec §13: "do not create a mysterious black-box score").
+    // See docs/BUSINESS_DEVELOPMENT.md.
+    'business_development' => [
+        // A still-open lead with no logged activity AND no upcoming
+        // follow-up for at least this many days is "going cold".
+        'stale_lead_days' => env('BD_STALE_LEAD_DAYS', 10),
+        // An open opportunity with no logged activity for at least this
+        // many days is flagged as stalled / at risk.
+        'stalled_opportunity_days' => env('BD_STALLED_OPPORTUNITY_DAYS', 21),
+        // A "recent engagement" prioritisation bonus applies when the
+        // lead has a logged activity within this many days.
+        'recent_engagement_days' => env('BD_RECENT_ENGAGEMENT_DAYS', 7),
+        // Max rows any single BD tool call returns — keeps the LLM's
+        // context bounded regardless of dataset size (spec §27).
+        'max_results_per_query' => env('BD_MAX_RESULTS_PER_QUERY', 25),
+
+        // Lead-prioritisation factor weights. The score is the plain sum
+        // of whichever of these apply; the tool always returns the
+        // matched factors alongside the number so a human can check the
+        // arithmetic themselves.
+        'weights' => [
+            'status_qualified' => 4,
+            'status_contacted' => 2,
+            'priority_high' => 3,
+            'priority_medium' => 1,
+            'follow_up_overdue' => 4,
+            'follow_up_missing' => 2,
+            'recent_engagement' => 2,
+            'no_engagement_ever' => 1,
+            'has_open_opportunity' => 3,
+            'high_estimated_value' => 2,
+        ],
+        // "high_estimated_value" factor applies at or above this amount
+        // (in the lead's own currency — never converted or mixed).
+        'high_value_threshold' => env('BD_HIGH_VALUE_THRESHOLD', 50000),
+        // Score bands for the human-readable priority label.
+        'bands' => [
+            'high' => env('BD_BAND_HIGH', 8),
+            'medium' => env('BD_BAND_MEDIUM', 4),
+        ],
+    ],
+
 ];

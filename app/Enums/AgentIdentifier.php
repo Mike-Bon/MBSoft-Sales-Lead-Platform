@@ -18,9 +18,18 @@ use App\Services\CostToServe\CostToServeAccessService;
  * the original three). Phase 12A: Manager-only, and only while the
  * global feature switch is on — commercial economics is management-
  * level information, matching CLAUDE.md's least-privilege rule.
- * isAvailableTo() is the single source of truth for this, consulted by
- * the assistant's dropdown, request validation, and routing alike —
- * never duplicated ad hoc.
+ *
+ * Phase 13 adds BusinessDevelopment as a fifth, in the same way — the
+ * Business Development tool category on the same single Agent engine
+ * (no orchestrator, no swarm, no agent-to-agent calls). Manager and
+ * Team Head only (prospecting/account-development is management- and
+ * team-lead-level work); a Team Member's business-development question
+ * falls back to the Sales agent, which already covers lead
+ * prioritisation. See docs/BUSINESS_DEVELOPMENT.md.
+ *
+ * isAvailableTo() is the single source of truth for eligibility,
+ * consulted by the assistant's dropdown, request validation, and
+ * routing alike — never duplicated ad hoc.
  */
 enum AgentIdentifier: string
 {
@@ -28,6 +37,7 @@ enum AgentIdentifier: string
     case Performance = 'performance';
     case Communication = 'communication';
     case CostToServe = 'cost_to_serve';
+    case BusinessDevelopment = 'business_development';
 
     public function label(): string
     {
@@ -36,6 +46,7 @@ enum AgentIdentifier: string
             self::Performance => 'Performance & Management',
             self::Communication => 'Communication & Follow-Up',
             self::CostToServe => 'Cost-to-Serve Intelligence',
+            self::BusinessDevelopment => 'Business Development',
         };
     }
 
@@ -54,6 +65,7 @@ enum AgentIdentifier: string
     {
         return match ($this) {
             self::CostToServe => app(CostToServeAccessService::class)->canAccess($user),
+            self::BusinessDevelopment => $user->isManager() || $user->isTeamHead(),
             default => true,
         };
     }

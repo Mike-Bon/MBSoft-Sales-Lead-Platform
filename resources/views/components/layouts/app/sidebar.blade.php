@@ -50,6 +50,15 @@
                         <flux:navlist.item icon="banknotes" :href="route('cost-to-serve.index')" :current="request()->routeIs('cost-to-serve.index')" :badge="$costToServeEnabled ? null : 'Off'" badge-color="zinc" wire:navigate>Cost-to-Serve</flux:navlist.item>
                         <flux:navlist.item icon="cog-6-tooth" :href="route('cost-to-serve.settings')" :current="request()->routeIs('cost-to-serve.settings')" wire:navigate>Cost-to-Serve Settings</flux:navlist.item>
                     @endif
+                    {{-- Phase 13: Business Development intelligence —
+                         Manager and Team Head only (a Team Head sees only
+                         their own team's data, enforced by
+                         LeadIntelligenceService, not this check), matching
+                         AgentIdentifier::BusinessDevelopment's own
+                         eligibility rule. --}}
+                    @if (auth()->user()->isManager() || auth()->user()->isTeamHead())
+                        <flux:navlist.item icon="light-bulb" :href="route('business-development.index')" :current="request()->routeIs('business-development.*')" wire:navigate>Business Development</flux:navlist.item>
+                    @endif
                 </flux:navlist.group>
 
                 <flux:navlist.group heading="Communication & AI">
@@ -67,6 +76,10 @@
                         @can('viewAny', App\Models\User::class)
                             <flux:navlist.item icon="identification" :href="route('organisation.users.index')" :current="request()->routeIs('organisation.users.*')" wire:navigate>Users</flux:navlist.item>
                         @endcan
+                        {{-- Company branding (name + logo) — Manager only. --}}
+                        @if (auth()->user()->isManager())
+                            <flux:navlist.item icon="building-office-2" :href="route('organisation.company.edit')" :current="request()->routeIs('organisation.company.*')" wire:navigate>Company</flux:navlist.item>
+                        @endif
                     </flux:navlist.group>
                 @endif
 

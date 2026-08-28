@@ -9,12 +9,14 @@ use App\Enums\AgentIdentifier;
 use App\Enums\KnowledgeType;
 use App\Enums\WorkflowType;
 use App\Services\Ai\AgentRegistry;
+use App\Services\Ai\Prompts\BusinessDevelopmentAgentPrompt;
 use App\Services\Ai\Prompts\CommunicationAgentPrompt;
 use App\Services\Ai\Prompts\CostToServeAgentPrompt;
 use App\Services\Ai\Prompts\PerformanceAgentPrompt;
 use App\Services\Ai\Prompts\SalesAgentPrompt;
 use App\Services\Ai\Providers\AnthropicProvider;
 use App\Services\Ai\ToolRegistry;
+use App\Services\Ai\Tools\AnalyzeAccountTool;
 use App\Services\Ai\Tools\CompareAccountPeriodTool;
 use App\Services\Ai\Tools\DraftEmailTool;
 use App\Services\Ai\Tools\DraftWhatsAppTool;
@@ -28,7 +30,12 @@ use App\Services\Ai\Tools\GetOpportunityTool;
 use App\Services\Ai\Tools\GetPipelineSummaryTool;
 use App\Services\Ai\Tools\GetRevenueConcentrationTool;
 use App\Services\Ai\Tools\GetTeamPerformanceTool;
+use App\Services\Ai\Tools\IdentifyAtRiskOpportunitiesTool;
+use App\Services\Ai\Tools\IdentifyFollowUpGapsTool;
+use App\Services\Ai\Tools\IdentifyMissingInformationTool;
 use App\Services\Ai\Tools\IdentifyRevenueExceptionsTool;
+use App\Services\Ai\Tools\IdentifyStaleLeadsTool;
+use App\Services\Ai\Tools\PrioritizeLeadsTool;
 use App\Services\Ai\Tools\SearchKnowledgeTool;
 use App\Services\Ai\Tools\SearchLeadsTool;
 use App\Services\Ai\Tools\SearchOpportunitiesTool;
@@ -147,6 +154,46 @@ class AppServiceProvider extends ServiceProvider
                         $app->make(IdentifyRevenueExceptionsTool::class),
                         new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
                             KnowledgeType::Policy,
+                        ]),
+                    ]),
+                    allowedWorkflows: [],
+                    maxToolIterations: $maxIterations,
+                ),
+                // Phase 13: the Business Development tool category on the
+                // same single Agent engine — no orchestrator, no swarm,
+                // no agent-to-agent calls. Manager + Team Head only
+                // (AgentIdentifier::BusinessDevelopment->isAvailableTo();
+                // a Team Member's request falls back to Sales). Reuses
+                // the existing read + draft-only tools and adds six
+                // read-only analytical tools backed by
+                // LeadIntelligenceService. No send/write tool of any
+                // kind. No workflow. See docs/BUSINESS_DEVELOPMENT.md.
+                new AgentDefinition(
+                    identifier: AgentIdentifier::BusinessDevelopment,
+                    name: AgentIdentifier::BusinessDevelopment->label(),
+                    purpose: 'Transparent lead prioritisation, follow-up/stale/at-risk detection, account intelligence, and draft-only outreach for prospecting decisions.',
+                    systemPrompt: BusinessDevelopmentAgentPrompt::text(),
+                    tools: new ToolRegistry([
+                        $app->make(PrioritizeLeadsTool::class),
+                        $app->make(IdentifyStaleLeadsTool::class),
+                        $app->make(IdentifyFollowUpGapsTool::class),
+                        $app->make(IdentifyAtRiskOpportunitiesTool::class),
+                        $app->make(AnalyzeAccountTool::class),
+                        $app->make(IdentifyMissingInformationTool::class),
+                        $app->make(SearchLeadsTool::class),
+                        $app->make(GetLeadTool::class),
+                        $app->make(SearchOpportunitiesTool::class),
+                        $app->make(GetOpportunityTool::class),
+                        $app->make(GetFollowupsTool::class),
+                        $app->make(GetPipelineSummaryTool::class),
+                        $app->make(GetCommunicationHistoryTool::class),
+                        $app->make(GetTeamPerformanceTool::class),
+                        $app->make(DraftEmailTool::class),
+                        $app->make(DraftWhatsAppTool::class),
+                        new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
+                            KnowledgeType::SalesPlaybook,
+                            KnowledgeType::ProductGuide,
+                            KnowledgeType::Sop,
                         ]),
                     ]),
                     allowedWorkflows: [],

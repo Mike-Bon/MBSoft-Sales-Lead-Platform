@@ -10,10 +10,11 @@ use InvalidArgumentException;
 use Tests\TestCase;
 
 /**
- * STEP 48/24: the registry resolves exactly the four approved agents
- * (Sales, Performance, Communication, and Phase 12's Cost-to-Serve),
- * each with its own explicit, non-overlapping-beyond-design tool
- * permission matrix — no agent receives a tool it isn't listed for.
+ * STEP 48/24: the registry resolves exactly the five approved agents
+ * (Sales, Performance, Communication, Phase 12's Cost-to-Serve, and
+ * Phase 13's Business Development), each with its own explicit,
+ * non-overlapping-beyond-design tool permission matrix — no agent
+ * receives a tool it isn't listed for.
  */
 class AgentRegistryTest extends TestCase
 {
@@ -29,11 +30,13 @@ class AgentRegistryTest extends TestCase
         }
     }
 
-    public function test_the_registry_lists_exactly_four_agents(): void
+    public function test_the_registry_lists_exactly_five_agents(): void
     {
-        // Phase 12 STEP: Cost-to-Serve is the fourth, deliberate,
-        // explicitly-scoped expansion of the closed set.
-        $this->assertCount(4, app(AgentRegistry::class)->all());
+        // Phase 12: Cost-to-Serve is the fourth; Phase 13: Business
+        // Development is the fifth — both deliberate, explicitly-scoped
+        // expansions of the closed set, each still one instance of the
+        // same single Agent engine.
+        $this->assertCount(5, app(AgentRegistry::class)->all());
     }
 
     public function test_sales_agent_has_the_documented_tool_set_and_no_others(): void
@@ -98,6 +101,37 @@ class AgentRegistryTest extends TestCase
         }
     }
 
+    /**
+     * Phase 13: the fifth agent's own tool set — the six read-only
+     * Business Development analytical tools plus reused read + draft-only
+     * tools. Never a create/update/assign/send/close tool of any kind,
+     * and never a Cost-to-Serve tool.
+     */
+    public function test_business_development_agent_has_the_documented_tool_set_and_no_others(): void
+    {
+        $tools = app(AgentRegistry::class)->get(AgentIdentifier::BusinessDevelopment)->tools;
+
+        foreach ([
+            'prioritize_leads', 'identify_stale_leads', 'identify_follow_up_gaps',
+            'identify_at_risk_opportunities', 'analyze_account', 'identify_missing_information',
+            'search_leads', 'get_lead', 'search_opportunities', 'get_opportunity',
+            'get_followups', 'get_pipeline_summary', 'get_communication_history',
+            'get_team_performance', 'draft_email', 'draft_whatsapp', 'search_knowledge',
+        ] as $tool) {
+            $this->assertNotNull($tools->find($tool), "Business Development Agent is missing {$tool}.");
+        }
+
+        // No write/send/close tool, and no Cost-to-Serve tool.
+        foreach ([
+            'create_lead', 'update_lead', 'assign_lead', 'send_email', 'send_whatsapp',
+            'close_opportunity', 'update_opportunity', 'set_lead_status',
+            'get_customer_revenue_summary', 'get_revenue_concentration', 'identify_revenue_exceptions',
+            'get_my_performance',
+        ] as $tool) {
+            $this->assertNull($tools->find($tool), "Business Development Agent must not have {$tool}.");
+        }
+    }
+
     public function test_no_agent_has_a_send_tool_of_any_kind(): void
     {
         $registry = app(AgentRegistry::class);
@@ -120,8 +154,8 @@ class AgentRegistryTest extends TestCase
             $prompts[] = $prompt;
         }
 
-        // Four genuinely distinct prompts, not the same text repeated.
-        $this->assertCount(4, array_unique($prompts));
+        // Five genuinely distinct prompts, not the same text repeated.
+        $this->assertCount(5, array_unique($prompts));
     }
 
     public function test_an_unknown_agent_identifier_is_rejected(): void
@@ -152,8 +186,9 @@ class AgentRegistryTest extends TestCase
         $this->assertSame([WorkflowType::DailyFollowUpReview], $registry->get(AgentIdentifier::Communication)->allowedWorkflows);
         $this->assertSame([WorkflowType::OpportunityAttentionReview], $registry->get(AgentIdentifier::Sales)->allowedWorkflows);
         $this->assertSame([WorkflowType::PerformanceExceptionReview], $registry->get(AgentIdentifier::Performance)->allowedWorkflows);
-        // Phase 12 adds no scheduled workflow.
+        // Phase 12 and Phase 13 both add no scheduled workflow.
         $this->assertSame([], $registry->get(AgentIdentifier::CostToServe)->allowedWorkflows);
+        $this->assertSame([], $registry->get(AgentIdentifier::BusinessDevelopment)->allowedWorkflows);
     }
 
     /**

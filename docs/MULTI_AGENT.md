@@ -4,13 +4,25 @@ This document is the authoritative reference for the multi-agent layer
 introduced in Phase 9. If this document and the code ever disagree, the
 code is a bug against this document, not the other way around.
 
-**Core principle:** specialization does not mean autonomy. Three
+**Core principle:** specialization does not mean autonomy. Multiple
 agents now exist instead of one, but every boundary from Phase 7/8 is
 preserved exactly: one authorization model, one `CommunicationService`
 send path, one audit model, one execution-limit mechanism, one provider
 abstraction. Routing decides *which* agent answers; it never decides
 *what that agent is allowed to do* — that remains each agent's own,
 identical tool-enforced authorization.
+
+> **Later additions.** Phase 9 shipped three agents; Phase 12 added a
+> fourth (**Cost-to-Serve Intelligence** — see `docs/COST_TO_SERVE.md`)
+> and Phase 13 a fifth (**Business Development** — see
+> `docs/BUSINESS_DEVELOPMENT.md`). Both are the same single `Agent`
+> engine with a different `AgentDefinition` — no orchestrator, no
+> swarm, no agent-to-agent calls were added. Everything below about the
+> engine, routing, `AgentPromptRules`, the audit trail, and the
+> no-autonomy boundaries applies to all five agents; only the counts
+> and the per-agent tool tables in this Phase 9 document were not
+> retro-edited. `AgentRegistryTest.php` is the authoritative,
+> always-current tool permission matrix for every agent.
 
 ## Architecture
 

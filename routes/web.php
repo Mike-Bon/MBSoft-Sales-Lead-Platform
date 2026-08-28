@@ -4,9 +4,9 @@ use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
-Route::get('/', function () {
-    return view('welcome');
-})->name('home');
+// V1 deployment-readiness: the public root has no marketing page — send
+// visitors straight to sign-in. welcome.blade.php is retained, unused.
+Route::get('/', fn () => redirect()->route('login'))->name('home');
 
 Route::get('dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
@@ -30,3 +30,4 @@ require __DIR__.'/workflows.php';
 require __DIR__.'/knowledge.php';
 require __DIR__.'/notifications.php';
 require __DIR__.'/cost-to-serve.php';
+require __DIR__.'/business-development.php';

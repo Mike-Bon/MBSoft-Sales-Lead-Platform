@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Organisation\CompanySettingsController;
 use App\Http\Controllers\Organisation\TeamController;
 use App\Http\Controllers\Organisation\UserController;
 use App\Http\Controllers\ProfileController;
@@ -18,6 +19,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('profile', [ProfileController::class, 'show'])->name('organisation.profile');
+
+    // Company branding (name + logo shown on the login page and sidebar).
+    // Manager-only — enforced in CompanySettingsController, not here.
+    Route::prefix('company')->name('organisation.company.')->group(function () {
+        Route::get('/', [CompanySettingsController::class, 'edit'])->name('edit');
+        Route::post('/', [CompanySettingsController::class, 'update'])->name('update');
+    });
 
     Route::prefix('teams')->name('organisation.teams.')->group(function () {
         Route::get('/', [TeamController::class, 'index'])->name('index');

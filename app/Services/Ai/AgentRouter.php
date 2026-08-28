@@ -44,9 +44,35 @@ final class AgentRouter
         'economic yield', 'profitability', 'revenue per deal', 'arpu',
     ];
 
+    /**
+     * Phase 13: deliberately specific analysis phrasing — never a bare
+     * "lead"/"follow-up"/"account" (those stay with Sales/Communication).
+     * Checked before Communication so "which leads need follow-up?"
+     * (analysis) lands on Business Development, while "draft a follow-up"
+     * (a drafting request) still falls through to Communication because
+     * none of these phrases match it.
+     */
+    private const BUSINESS_DEVELOPMENT_KEYWORDS = [
+        'prioriti', 'stale lead', 'going cold', 'gone cold', 'cold lead',
+        'call plan', 'discovery question', 'discovery call',
+        'account plan', 'account summary', 'analyze this account', 'analyse this account',
+        'summarize this account', 'summarise this account', 'summarize the account', 'summarise the account',
+        'at risk', 'at-risk',
+        'missing information', 'incomplete information', 'what information is missing', 'what am i missing',
+        'follow-up gap', 'follow up gap', 'who needs follow', 'needs follow-up', 'need follow-up',
+        'needs a follow-up', 'overdue follow',
+        'next best action', 'next action', 'what should my next',
+        'expansion potential', 'expansion opportunit',
+        'which prospects', 'prospects to pursue', 'pursue first', 'which leads should i',
+    ];
+
     public function route(string $message): AgentIdentifier
     {
         $lower = strtolower($message);
+
+        if ($this->matchesAny($lower, self::BUSINESS_DEVELOPMENT_KEYWORDS)) {
+            return AgentIdentifier::BusinessDevelopment;
+        }
 
         if ($this->matchesAny($lower, self::COMMUNICATION_KEYWORDS)) {
             return AgentIdentifier::Communication;
