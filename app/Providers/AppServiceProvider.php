@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Contracts\Ai\LlmProvider;
 use App\Contracts\Communication\EmailProvider;
 use App\Contracts\Communication\WhatsAppProvider;
+use App\Contracts\MarketIntelligence\SearchProvider;
 use App\Enums\AgentIdentifier;
 use App\Enums\KnowledgeType;
 use App\Enums\WorkflowType;
@@ -12,12 +13,14 @@ use App\Services\Ai\AgentRegistry;
 use App\Services\Ai\Prompts\BusinessDevelopmentAgentPrompt;
 use App\Services\Ai\Prompts\CommunicationAgentPrompt;
 use App\Services\Ai\Prompts\CostToServeAgentPrompt;
+use App\Services\Ai\Prompts\MarketIntelligenceAgentPrompt;
 use App\Services\Ai\Prompts\PerformanceAgentPrompt;
 use App\Services\Ai\Prompts\SalesAgentPrompt;
 use App\Services\Ai\Providers\AnthropicProvider;
 use App\Services\Ai\ToolRegistry;
 use App\Services\Ai\Tools\AnalyzeAccountTool;
 use App\Services\Ai\Tools\CompareAccountPeriodTool;
+use App\Services\Ai\Tools\DiscoverProspectsTool;
 use App\Services\Ai\Tools\DraftEmailTool;
 use App\Services\Ai\Tools\DraftWhatsAppTool;
 use App\Services\Ai\Tools\GetCommunicationHistoryTool;
@@ -42,7 +45,10 @@ use App\Services\Ai\Tools\SearchOpportunitiesTool;
 use App\Services\Communication\Providers\GmailEmailProvider;
 use App\Services\Communication\Providers\WhatsAppCloudApiProvider;
 use App\Services\Knowledge\KnowledgeSearchService;
+use App\Services\MarketIntelligence\Providers\BraveSearchProvider;
+use App\Services\MarketIntelligence\Providers\NullSearchProvider;
 use App\Support\Ai\AgentDefinition;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -63,6 +69,24 @@ class AppServiceProvider extends ServiceProvider
         // future different provider needs one new class, never a
         // rewrite of Agent, AgentRegistry, or any AgentTool.
         $this->app->bind(LlmProvider::class, AnthropicProvider::class);
+
+        // V2.1: external web search provider isolation. Only
+        // ProspectDiscoveryService depends on this. No key configured
+        // -> NullSearchProvider (discovery reports "not configured",
+        // never 500s). Tests bind a fake.
+        $this->app->bind(SearchProvider::class, function ($app) {
+            $config = $app['config']['services.search'];
+
+            return match ($config['provider'] ?? null) {
+                'brave' => new BraveSearchProvider(
+                    $app->make(HttpFactory::class),
+                    (string) ($config['brave']['api_key'] ?? ''),
+                    (int) ($config['timeout'] ?? 15),
+                    $config['brave']['country'] ?? null,
+                ),
+                default => new NullSearchProvider,
+            };
+        });
 
         // Phase 9 STEP 6/24: the three approved specialized agents and
         // their explicit tool permission matrix — no agent receives a
@@ -194,6 +218,29 @@ class AppServiceProvider extends ServiceProvider
                             KnowledgeType::SalesPlaybook,
                             KnowledgeType::ProductGuide,
                             KnowledgeType::Sop,
+                        ]),
+                    ]),
+                    allowedWorkflows: [],
+                    maxToolIterations: $maxIterations,
+                ),
+                // V2.1: the Market Intelligence agent — external prospect
+                // discovery only. Same single Agent engine; its entire
+                // ToolRegistry is discover_prospects + a scoped
+                // search_knowledge. NO CRM read/write tool, NO draft/send
+                // tool, NO Cost-to-Serve tool, NO raw-query tool — the
+                // structural boundary between hostile external content
+                // and every internal capability. Manager + Team Head
+                // only. No workflow. See docs/MARKET_INTELLIGENCE.md.
+                new AgentDefinition(
+                    identifier: AgentIdentifier::MarketIntelligence,
+                    name: AgentIdentifier::MarketIntelligence->label(),
+                    purpose: 'External prospect discovery from public web sources — candidate businesses with evidence, no CRM or scoring.',
+                    systemPrompt: MarketIntelligenceAgentPrompt::text(),
+                    tools: new ToolRegistry([
+                        $app->make(DiscoverProspectsTool::class),
+                        new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
+                            KnowledgeType::SalesPlaybook,
+                            KnowledgeType::ProductGuide,
                         ]),
                     ]),
                     allowedWorkflows: [],

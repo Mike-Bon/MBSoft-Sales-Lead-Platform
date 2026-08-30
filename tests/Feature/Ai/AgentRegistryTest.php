@@ -10,11 +10,11 @@ use InvalidArgumentException;
 use Tests\TestCase;
 
 /**
- * STEP 48/24: the registry resolves exactly the five approved agents
- * (Sales, Performance, Communication, Phase 12's Cost-to-Serve, and
- * Phase 13's Business Development), each with its own explicit,
- * non-overlapping-beyond-design tool permission matrix — no agent
- * receives a tool it isn't listed for.
+ * STEP 48/24: the registry resolves exactly the six approved agents
+ * (Sales, Performance, Communication, Phase 12's Cost-to-Serve, Phase
+ * 13's Business Development, and V2.1's Market Intelligence), each with
+ * its own explicit, non-overlapping-beyond-design tool permission
+ * matrix — no agent receives a tool it isn't listed for.
  */
 class AgentRegistryTest extends TestCase
 {
@@ -30,13 +30,14 @@ class AgentRegistryTest extends TestCase
         }
     }
 
-    public function test_the_registry_lists_exactly_five_agents(): void
+    public function test_the_registry_lists_exactly_six_agents(): void
     {
         // Phase 12: Cost-to-Serve is the fourth; Phase 13: Business
-        // Development is the fifth — both deliberate, explicitly-scoped
-        // expansions of the closed set, each still one instance of the
-        // same single Agent engine.
-        $this->assertCount(5, app(AgentRegistry::class)->all());
+        // Development is the fifth; V2.1: Market Intelligence is the
+        // sixth — each a deliberate, explicitly-scoped expansion of the
+        // closed set, and each still one instance of the same single
+        // Agent engine.
+        $this->assertCount(6, app(AgentRegistry::class)->all());
     }
 
     public function test_sales_agent_has_the_documented_tool_set_and_no_others(): void
@@ -132,6 +133,37 @@ class AgentRegistryTest extends TestCase
         }
     }
 
+    /**
+     * V2.1: the sixth agent's own tool set — external prospect discovery
+     * only. discover_prospects + a scoped search_knowledge, and NOTHING
+     * that touches the CRM, communications, performance, or
+     * Cost-to-Serve. The absent tools below are the structural boundary
+     * between hostile external web content and every internal capability.
+     */
+    public function test_market_intelligence_agent_has_the_documented_tool_set_and_no_others(): void
+    {
+        $tools = app(AgentRegistry::class)->get(AgentIdentifier::MarketIntelligence)->tools;
+
+        foreach (['discover_prospects', 'search_knowledge'] as $tool) {
+            $this->assertNotNull($tools->find($tool), "Market Intelligence Agent is missing {$tool}.");
+        }
+
+        $this->assertCount(2, $tools->definitions(), 'Market Intelligence Agent must have exactly two tools.');
+
+        foreach ([
+            'search_leads', 'get_lead', 'search_opportunities', 'get_opportunity',
+            'get_followups', 'get_communication_history', 'get_pipeline_summary',
+            'get_my_performance', 'get_team_performance',
+            'draft_email', 'draft_whatsapp', 'send_email', 'send_whatsapp',
+            'prioritize_leads', 'identify_stale_leads', 'analyze_account',
+            'get_customer_revenue_summary', 'get_customer_engagement_summary',
+            'get_revenue_concentration', 'compare_account_period', 'identify_revenue_exceptions',
+            'create_lead', 'update_lead', 'assign_lead',
+        ] as $tool) {
+            $this->assertNull($tools->find($tool), "Market Intelligence Agent must not have {$tool}.");
+        }
+    }
+
     public function test_no_agent_has_a_send_tool_of_any_kind(): void
     {
         $registry = app(AgentRegistry::class);
@@ -154,8 +186,8 @@ class AgentRegistryTest extends TestCase
             $prompts[] = $prompt;
         }
 
-        // Five genuinely distinct prompts, not the same text repeated.
-        $this->assertCount(5, array_unique($prompts));
+        // Six genuinely distinct prompts, not the same text repeated.
+        $this->assertCount(6, array_unique($prompts));
     }
 
     public function test_an_unknown_agent_identifier_is_rejected(): void
@@ -186,9 +218,10 @@ class AgentRegistryTest extends TestCase
         $this->assertSame([WorkflowType::DailyFollowUpReview], $registry->get(AgentIdentifier::Communication)->allowedWorkflows);
         $this->assertSame([WorkflowType::OpportunityAttentionReview], $registry->get(AgentIdentifier::Sales)->allowedWorkflows);
         $this->assertSame([WorkflowType::PerformanceExceptionReview], $registry->get(AgentIdentifier::Performance)->allowedWorkflows);
-        // Phase 12 and Phase 13 both add no scheduled workflow.
+        // Phase 12, Phase 13, and V2.1 all add no scheduled workflow.
         $this->assertSame([], $registry->get(AgentIdentifier::CostToServe)->allowedWorkflows);
         $this->assertSame([], $registry->get(AgentIdentifier::BusinessDevelopment)->allowedWorkflows);
+        $this->assertSame([], $registry->get(AgentIdentifier::MarketIntelligence)->allowedWorkflows);
     }
 
     /**
@@ -232,5 +265,11 @@ class AgentRegistryTest extends TestCase
         $this->assertStringContainsString('Policy', $costToServeDescription);
         $this->assertStringNotContainsString('Sales Playbook', $costToServeDescription);
         $this->assertStringNotContainsString('Training', $costToServeDescription);
+
+        $marketIntelligenceDescription = $registry->get(AgentIdentifier::MarketIntelligence)->tools->find('search_knowledge')->definition()->description;
+        $this->assertStringContainsString('Sales Playbook', $marketIntelligenceDescription);
+        $this->assertStringContainsString('Product Guide', $marketIntelligenceDescription);
+        $this->assertStringNotContainsString('Policy', $marketIntelligenceDescription);
+        $this->assertStringNotContainsString('Training', $marketIntelligenceDescription);
     }
 }

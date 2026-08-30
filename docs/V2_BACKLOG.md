@@ -6,6 +6,14 @@ detail, or started — recording an item here is not authorization to
 begin it in a future session without the user's explicit go-ahead,
 per CLAUDE.md's phase discipline.
 
+> **Superseded in part by the approved V2 track** (`CLAUDE.md` "## V2 —
+> Market Intelligence & Prospect Discovery"). "External
+> prospecting/enrichment systems" and "a new AI-agent role" below were
+> Phase-11-era exclusions; V2 explicitly reopened external prospect
+> **discovery**. **V2.1 — External Prospect Discovery** is now built (a
+> sixth, isolated `MarketIntelligence` agent — `docs/MARKET_INTELLIGENCE.md`).
+> V2.2–V2.6 remain not started and still require explicit go-ahead.
+
 ## Explicitly out of scope per Phase 11's instruction
 
 - **Cost-to-Serve Agent** — a fourth specialized AI agent, previously

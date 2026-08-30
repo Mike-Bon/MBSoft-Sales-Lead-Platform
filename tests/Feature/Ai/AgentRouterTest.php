@@ -62,6 +62,22 @@ class AgentRouterTest extends TestCase
         $this->assertSame(AgentIdentifier::Communication, (new AgentRouter)->route('Draft a follow-up about the stalled ABC opportunity.'));
     }
 
+    public function test_an_external_discovery_question_routes_to_market_intelligence(): void
+    {
+        $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('Find businesses in Cebu selling cosmetics online.'));
+        $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('Find companies that sell motorcycle parts in Davao.'));
+        $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('I want to do some market research on online sellers of apparel.'));
+        $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('Find potential courier customers in the Visayas.'));
+    }
+
+    public function test_market_intelligence_wording_does_not_hijack_an_internal_crm_question(): void
+    {
+        // "my leads", "our pipeline", a named account — internal, never MI.
+        $this->assertSame(AgentIdentifier::BusinessDevelopment, (new AgentRouter)->route('Which of my leads are going cold?'));
+        $this->assertSame(AgentIdentifier::Sales, (new AgentRouter)->route('What is in my pipeline this month?'));
+        $this->assertSame(AgentIdentifier::Communication, (new AgentRouter)->route('Draft a follow-up about the stalled ABC opportunity.'));
+    }
+
     public function test_draft_a_whatsapp_routes_to_communication(): void
     {
         $this->assertSame(AgentIdentifier::Communication, (new AgentRouter)->route('Draft a WhatsApp to John.'));

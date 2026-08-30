@@ -27,6 +27,13 @@ use App\Services\CostToServe\CostToServeAccessService;
  * falls back to the Sales agent, which already covers lead
  * prioritisation. See docs/BUSINESS_DEVELOPMENT.md.
  *
+ * V2.1 adds MarketIntelligence as a sixth — the same single Agent
+ * engine, but its ToolRegistry contains only external-research tools
+ * (discover_prospects + a scoped search_knowledge). It has no path to
+ * the CRM, communications, or Cost-to-Serve. Manager and Team Head
+ * only; a Team Member's discovery request falls back to Sales. See
+ * docs/MARKET_INTELLIGENCE.md.
+ *
  * isAvailableTo() is the single source of truth for eligibility,
  * consulted by the assistant's dropdown, request validation, and
  * routing alike — never duplicated ad hoc.
@@ -38,6 +45,7 @@ enum AgentIdentifier: string
     case Communication = 'communication';
     case CostToServe = 'cost_to_serve';
     case BusinessDevelopment = 'business_development';
+    case MarketIntelligence = 'market_intelligence';
 
     public function label(): string
     {
@@ -47,6 +55,7 @@ enum AgentIdentifier: string
             self::Communication => 'Communication & Follow-Up',
             self::CostToServe => 'Cost-to-Serve Intelligence',
             self::BusinessDevelopment => 'Business Development',
+            self::MarketIntelligence => 'Market Intelligence',
         };
     }
 
@@ -66,6 +75,7 @@ enum AgentIdentifier: string
         return match ($this) {
             self::CostToServe => app(CostToServeAccessService::class)->canAccess($user),
             self::BusinessDevelopment => $user->isManager() || $user->isTeamHead(),
+            self::MarketIntelligence => $user->isManager() || $user->isTeamHead(),
             default => true,
         };
     }

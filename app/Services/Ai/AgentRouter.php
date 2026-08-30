@@ -66,9 +66,29 @@ final class AgentRouter
         'which prospects', 'prospects to pursue', 'pursue first', 'which leads should i',
     ];
 
+    /**
+     * V2.1: external prospect discovery. Deliberately specific phrasing
+     * about finding NEW businesses/companies "out there" — checked
+     * first, and it never matches an internal-CRM question (which
+     * refers to "my leads", "our pipeline", a named account, etc.).
+     */
+    private const MARKET_INTELLIGENCE_KEYWORDS = [
+        'find businesses', 'find companies', 'find me businesses', 'find me companies',
+        'businesses in ', 'companies in ', 'businesses selling', 'companies selling',
+        'businesses that sell', 'companies that sell', 'businesses that appear', 'companies that appear',
+        'online sellers', 'find online', 'sellers of', 'find sellers',
+        'find potential customer', 'find potential client', 'potential courier customer',
+        'discover prospect', 'prospect discovery', 'market research', 'market intelligence',
+        'find target companies', 'find new businesses', 'find shops', 'find stores',
+    ];
+
     public function route(string $message): AgentIdentifier
     {
         $lower = strtolower($message);
+
+        if ($this->matchesAny($lower, self::MARKET_INTELLIGENCE_KEYWORDS)) {
+            return AgentIdentifier::MarketIntelligence;
+        }
 
         if ($this->matchesAny($lower, self::BUSINESS_DEVELOPMENT_KEYWORDS)) {
             return AgentIdentifier::BusinessDevelopment;

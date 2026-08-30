@@ -178,4 +178,39 @@ return [
         ],
     ],
 
+    // ── V2.1: External web search provider ──────────────────────────
+    // Provider abstraction for Market Intelligence prospect discovery.
+    // Bound in AppServiceProvider: 'brave' -> BraveSearchProvider,
+    // anything else (or unset) -> NullSearchProvider (discovery reports
+    // "not configured" and never 500s). No credential is ever logged.
+    // See docs/MARKET_INTELLIGENCE.md.
+    'search' => [
+        'provider' => env('SEARCH_PROVIDER'),
+        'timeout' => env('SEARCH_HTTP_TIMEOUT', 15),
+        'brave' => [
+            'api_key' => env('BRAVE_SEARCH_API_KEY', ''),
+            // Optional ISO country bias for results, e.g. "PH". Blank = global.
+            'country' => env('BRAVE_SEARCH_COUNTRY'),
+        ],
+    ],
+
+    // ── V2.1: Market Intelligence — External Prospect Discovery ─────
+    // Every external effect is bounded by these limits and nowhere else
+    // (spec §3/§5). Discovery is DISCOVERY ONLY — no scoring, no CRM
+    // writes, no outreach. See docs/MARKET_INTELLIGENCE.md.
+    'market_intelligence' => [
+        // Hard cap on candidates any one discovery call returns.
+        'max_results' => env('MARKET_INTELLIGENCE_MAX_RESULTS', 20),
+        // Max deterministic search queries built per discovery call.
+        'max_searches' => env('MARKET_INTELLIGENCE_MAX_SEARCHES', 3),
+        // Results requested from the provider per query.
+        'results_per_search' => env('MARKET_INTELLIGENCE_RESULTS_PER_SEARCH', 8),
+        // Max public pages fetched for evidence per discovery call.
+        'max_fetches' => env('MARKET_INTELLIGENCE_MAX_FETCHES', 12),
+        // Per-page fetch timeout, seconds.
+        'fetch_timeout' => env('MARKET_INTELLIGENCE_FETCH_TIMEOUT', 8),
+        // Per-user discovery calls allowed per rolling hour.
+        'max_discoveries_per_hour' => env('MARKET_INTELLIGENCE_MAX_PER_HOUR', 12),
+    ],
+
 ];
