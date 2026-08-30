@@ -222,6 +222,46 @@ return [
         'max_qualification_fetches' => env('MARKET_INTELLIGENCE_MAX_QUALIFY_FETCHES', 8),
         // Per-user qualification calls allowed per rolling hour.
         'max_qualifications_per_hour' => env('MARKET_INTELLIGENCE_MAX_QUALIFY_PER_HOUR', 12),
+
+        // ── V2.3: Transparent Prospect Lead Scoring ────────────────
+        // A deterministic 100-point business-development prioritisation
+        // model computed by the application from V2.2 qualification
+        // evidence — NEVER by the LLM, NEVER a conversion probability.
+        // Same pattern as config('services.business_development'). Edit
+        // the weights here to tune; the model is validated on load and
+        // falls back to the frozen defaults if it does not total 100 or
+        // the bands overlap. See docs/MARKET_INTELLIGENCE.md.
+        'scoring' => [
+            'model_version' => env('MI_SCORING_VERSION', 'v2.3-default-1'),
+            // Seven dimensions; the weights MUST total exactly 100.
+            'weights' => [
+                'industry_fit' => 20,
+                'geography_fit' => 15,
+                'online_selling' => 20,
+                'physical_product_relevance' => 15,
+                'shipping_signals' => 15,
+                'digital_activity' => 10,
+                'evidence_quality' => 5,
+            ],
+            // A CEILING applied to the raw score per qualification
+            // outcome (spec §14) — never added points. Must be
+            // non-increasing from strong_match to insufficient_evidence.
+            'outcome_caps' => [
+                'strong_match' => 100,
+                'possible_match' => 85,
+                'weak_match' => 55,
+                'insufficient_evidence' => 35,
+            ],
+            // Priority-band thresholds: HIGH >= high, MEDIUM >= medium,
+            // else LOW. 0 < medium < high <= 100.
+            'bands' => [
+                'high' => env('MI_SCORING_BAND_HIGH', 75),
+                'medium' => env('MI_SCORING_BAND_MEDIUM', 50),
+            ],
+            // Per-user scoring calls allowed per rolling hour (scoring
+            // re-runs the bounded V2.2 qualification pipeline).
+            'max_scorings_per_hour' => env('MARKET_INTELLIGENCE_MAX_SCORE_PER_HOUR', 12),
+        ],
     ],
 
 ];

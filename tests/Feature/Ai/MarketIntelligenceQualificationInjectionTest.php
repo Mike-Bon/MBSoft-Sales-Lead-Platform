@@ -118,10 +118,12 @@ class MarketIntelligenceQualificationInjectionTest extends TestCase
     {
         $definition = app(AgentRegistry::class)->get(AgentIdentifier::MarketIntelligence);
 
-        $this->assertCount(3, $definition->tools->definitions());
+        // V2.3 adds score_prospects — still exactly four tools, none of
+        // which write, send, query the database, or reach the CRM/CtS.
+        $this->assertCount(4, $definition->tools->definitions());
 
         foreach ($definition->tools->definitions() as $tool) {
-            foreach (['sql', 'query', 'raw', 'create', 'update', 'delete', 'assign', 'send', 'draft', 'close', 'convert', 'score', 'points'] as $forbidden) {
+            foreach (['sql', 'query', 'raw', 'create', 'update', 'delete', 'assign', 'send', 'draft', 'close', 'convert'] as $forbidden) {
                 $this->assertStringNotContainsStringIgnoringCase($forbidden, $tool->name);
             }
         }

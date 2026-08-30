@@ -94,8 +94,7 @@ final class ProspectQualificationService
      */
     public function qualify(User $actor, DiscoveryCriteria $discoveryCriteria, QualificationCriteria $criteria, array $focusDomains = []): array
     {
-        $config = config('services.market_intelligence');
-        $perHour = (int) ($config['max_qualifications_per_hour'] ?? 12);
+        $perHour = (int) (config('services.market_intelligence.max_qualifications_per_hour') ?? 12);
         $key = 'market-intel:qualify:'.$actor->id;
 
         if (RateLimiter::tooManyAttempts($key, $perHour)) {
@@ -106,22 +105,72 @@ final class ProspectQualificationService
         }
         RateLimiter::hit($key, 3600);
 
+        $run = $this->qualifyToObjects($discoveryCriteria, $criteria, $focusDomains);
+
+        if ($run['status'] !== 'ok') {
+            return $this->result($run['status'], $discoveryCriteria, $criteria, null, array_filter([
+                'message' => $run['message'] ?? null,
+                'provider_failures' => $run['provider_failures'] ?: null,
+            ]));
+        }
+
+        $outcomeCounts = $this->outcomeCounts($run['prospects']);
+
+        AuditLogger::record('market_intelligence.qualification', $actor, [
+            'discovery_criteria' => $discoveryCriteria->toArray(),
+            'qualification_criteria' => $criteria->toArray(),
+            'provider' => $this->search->name(),
+            'prospect_count' => count($run['prospects']),
+            'outcome_counts' => $outcomeCounts,
+            'research' => $run['research'],
+            'provider_failures' => count($run['provider_failures']) + $run['research']['provider_failures'],
+            'status' => 'ok',
+        ]);
+
+        return $this->result('ok', $discoveryCriteria, $criteria, $run['budget'], [
+            'qualified_prospects' => array_map(fn (QualifiedProspect $q) => $q->toArray(), $run['prospects']),
+            'outcome_counts' => $outcomeCounts,
+            'provider_failures' => $run['provider_failures'],
+        ]);
+    }
+
+    /**
+     * Discovery → per-criterion evaluation → bounded research → assemble,
+     * returning the QualifiedProspect OBJECTS (no rate-limit, no audit —
+     * the caller owns those). V2.3's ProspectScoringService reuses this
+     * so it never reconstructs a prospect from conversation text and
+     * never opens a second search/fetch pipeline (spec §3).
+     *
+     * @param  list<string>  $focusDomains
+     * @return array{status: string, prospects: list<QualifiedProspect>, research: array<string, int>, budget: ?QualificationResearchBudget, provider_failures: list<array<string, string>>, message?: string}
+     */
+    public function qualifyToObjects(DiscoveryCriteria $discoveryCriteria, QualificationCriteria $criteria, array $focusDomains = []): array
+    {
+        $config = config('services.market_intelligence');
         $gathered = $this->discovery->gather($discoveryCriteria);
 
         if ($gathered['status'] === 'provider_unavailable') {
-            return $this->result('provider_unavailable', $discoveryCriteria, $criteria, null, [
-                'message' => 'The external search service is currently unavailable. Nothing could be qualified.',
+            return [
+                'status' => 'provider_unavailable',
+                'prospects' => [],
+                'research' => (new QualificationResearchBudget(0, 0))->toArray(),
+                'budget' => null,
                 'provider_failures' => $gathered['provider_failures'],
-            ]);
+                'message' => 'The external search service is currently unavailable. Nothing could be qualified.',
+            ];
         }
 
-        /** @var list<ProspectCandidate> $candidates */
         $candidates = $this->focus($gathered['candidates'], $focusDomains);
 
         if ($candidates === []) {
-            return $this->result('no_prospects', $discoveryCriteria, $criteria, null, [
+            return [
+                'status' => 'no_prospects',
+                'prospects' => [],
+                'research' => (new QualificationResearchBudget(0, 0))->toArray(),
+                'budget' => null,
+                'provider_failures' => $gathered['provider_failures'],
                 'message' => 'No candidate businesses were found to qualify for these criteria.',
-            ]);
+            ];
         }
 
         $candidates = array_slice($candidates, 0, $criteria->maxProspects);
@@ -147,24 +196,13 @@ final class ProspectQualificationService
             $qualified[] = $this->assemble($candidate, $evaluations);
         }
 
-        $outcomeCounts = $this->outcomeCounts($qualified);
-
-        AuditLogger::record('market_intelligence.qualification', $actor, [
-            'discovery_criteria' => $discoveryCriteria->toArray(),
-            'qualification_criteria' => $criteria->toArray(),
-            'provider' => $this->search->name(),
-            'prospect_count' => count($qualified),
-            'outcome_counts' => $outcomeCounts,
-            'research' => $budget->toArray(),
-            'provider_failures' => count($gathered['provider_failures']) + $budget->providerFailureCount(),
+        return [
             'status' => 'ok',
-        ]);
-
-        return $this->result('ok', $discoveryCriteria, $criteria, $budget, [
-            'qualified_prospects' => array_map(fn (QualifiedProspect $q) => $q->toArray(), $qualified),
-            'outcome_counts' => $outcomeCounts,
+            'prospects' => $qualified,
+            'research' => $budget->toArray(),
+            'budget' => $budget,
             'provider_failures' => $gathered['provider_failures'],
-        ]);
+        ];
     }
 
     // ── PURE CORE ────────────────────────────────────────────────────

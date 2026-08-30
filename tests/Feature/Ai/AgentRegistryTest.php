@@ -134,22 +134,23 @@ class AgentRegistryTest extends TestCase
     }
 
     /**
-     * V2.1 + V2.2: the sixth agent's own tool set — external prospect
-     * discovery and qualification only. discover_prospects +
-     * qualify_prospects + a scoped search_knowledge, and NOTHING that
-     * touches the CRM, communications, performance, or Cost-to-Serve.
-     * The absent tools below are the structural boundary between hostile
-     * external web content and every internal capability.
+     * V2.1 + V2.2 + V2.3: the sixth agent's own tool set — external
+     * prospect discovery, qualification, and prioritisation scoring only.
+     * discover_prospects + qualify_prospects + score_prospects + a scoped
+     * search_knowledge, and NOTHING that touches the CRM, communications,
+     * performance, or Cost-to-Serve. The absent tools below are the
+     * structural boundary between hostile external web content and every
+     * internal capability.
      */
     public function test_market_intelligence_agent_has_the_documented_tool_set_and_no_others(): void
     {
         $tools = app(AgentRegistry::class)->get(AgentIdentifier::MarketIntelligence)->tools;
 
-        foreach (['discover_prospects', 'qualify_prospects', 'search_knowledge'] as $tool) {
+        foreach (['discover_prospects', 'qualify_prospects', 'score_prospects', 'search_knowledge'] as $tool) {
             $this->assertNotNull($tools->find($tool), "Market Intelligence Agent is missing {$tool}.");
         }
 
-        $this->assertCount(3, $tools->definitions(), 'Market Intelligence Agent must have exactly three tools.');
+        $this->assertCount(4, $tools->definitions(), 'Market Intelligence Agent must have exactly four tools.');
 
         foreach ([
             'search_leads', 'get_lead', 'search_opportunities', 'get_opportunity',

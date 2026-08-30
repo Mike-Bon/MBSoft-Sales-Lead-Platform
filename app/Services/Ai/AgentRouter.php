@@ -89,6 +89,12 @@ final class AgentRouter
         'do these prospects match', 'which of these are a strong match', 'which of these match',
         'against my criteria', 'against these criteria', 'against the criteria',
         'hard criteria', 'evidence-based qualification', 'how well do these match',
+        // V2.3 — prospect scoring / prioritisation
+        'score prospect', 'score these', 'score the prospect', 'score the businesses',
+        'score and rank', 'prospect score', 'prospect scoring', 'prospect prioritisation',
+        'prospect prioritization', 'prioritise these prospects', 'prioritize these prospects',
+        'prioritise prospects', 'prioritize prospects', 'rank these prospects', 'rank the prospects',
+        'rank prospects', 'priority band', 'which prospects deserve', 'which prospects should we pursue',
     ];
 
     public function route(string $message): AgentIdentifier
