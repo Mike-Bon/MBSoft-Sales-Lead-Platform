@@ -22,6 +22,9 @@ class FakeSearchProvider implements SearchProvider
     /** @var list<string> */
     public array $queries = [];
 
+    /** @var (\Closure(string): list<array{title?: string, url: string, description?: string}>)|null */
+    private $resolver = null;
+
     /**
      * @param  list<SearchResult>  $results
      */
@@ -30,6 +33,21 @@ class FakeSearchProvider implements SearchProvider
         private ?\Throwable $throw = null,
         private string $name = 'fake',
     ) {}
+
+    /**
+     * Return different rows depending on the query text — used by V2.2
+     * qualification tests where discovery and the follow-up research
+     * search need distinct results.
+     *
+     * @param  \Closure(string): list<array{title?: string, url: string, description?: string}>  $resolver
+     */
+    public static function usingResolver(\Closure $resolver): self
+    {
+        $fake = new self;
+        $fake->resolver = $resolver;
+
+        return $fake;
+    }
 
     /**
      * @param  list<array{title?: string, url: string, description?: string}>  $rows
@@ -53,6 +71,15 @@ class FakeSearchProvider implements SearchProvider
 
         if ($this->throw !== null) {
             throw $this->throw;
+        }
+
+        if ($this->resolver !== null) {
+            $rows = ($this->resolver)($query);
+
+            return array_slice(array_map(
+                fn (array $row) => new SearchResult($row['title'] ?? '', $row['url'], $row['description'] ?? ''),
+                $rows,
+            ), 0, $limit);
         }
 
         return array_slice($this->results, 0, $limit);

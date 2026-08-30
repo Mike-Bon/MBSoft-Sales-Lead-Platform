@@ -4,8 +4,10 @@ namespace App\Services\MarketIntelligence;
 
 use App\Support\MarketIntelligence\DiscoveryCriteria;
 use App\Support\MarketIntelligence\EvidenceItem;
+use App\Support\MarketIntelligence\EvidenceStrength;
 use App\Support\MarketIntelligence\ProspectCandidate;
 use App\Support\MarketIntelligence\SearchResult;
+use App\Support\MarketIntelligence\SourceQuality;
 use Illuminate\Support\Str;
 
 /**
@@ -55,26 +57,35 @@ final class EvidenceExtractor
         $haystackParts = [strtolower($primaryResult->title.' '.$primaryResult->description)];
         $links = [];
 
+        // V2.2 (spec §11/§20): claims read off the business's own fetched
+        // page are DIRECT / official_company; claims read off a search
+        // snippet only are INDIRECT / search_result.
+        $ownDomain = ! $this->isSocialHost($domain) && ! $this->isAggregator($domain);
+
         if ($page !== null) {
             $haystackParts[] = strtolower($page->title.' '.$page->description.' '.$page->text);
             $links = $page->links;
             $sourceUrl = $page->url;
             $observedAt = $page->fetchedAt;
+            $quality = $ownDomain ? SourceQuality::OfficialCompany : SourceQuality::Directory;
 
             $evidence[] = new EvidenceItem(
                 EvidenceItem::TYPE_DESCRIPTION,
                 'Website: "'.Str::limit($page->title !== '' ? $page->title : $page->description, 160).'"',
-                $sourceUrl, $domain, $observedAt,
+                $sourceUrl, $domain, $observedAt, $quality->baselineStrength(), $quality,
             );
         } else {
             $sourceUrl = $primaryResult->url;
             $observedAt = $now;
+            $quality = SourceQuality::SearchResult;
             $evidence[] = new EvidenceItem(
                 EvidenceItem::TYPE_DESCRIPTION,
                 'Search result: "'.Str::limit(trim($primaryResult->title.' — '.$primaryResult->description), 200).'"',
-                $sourceUrl, $domain, $observedAt,
+                $sourceUrl, $domain, $observedAt, $quality->baselineStrength(), $quality,
             );
         }
+
+        $strength = $quality->baselineStrength();
 
         $haystack = implode(' ', $haystackParts);
         $linkBlob = strtolower(implode(' ', $links).' '.$sourceUrl);
@@ -89,7 +100,7 @@ final class EvidenceExtractor
                     $evidence[] = new EvidenceItem(
                         EvidenceItem::TYPE_LOCATION,
                         'Source text mentions "'.$token.'".',
-                        $sourceUrl, $domain, $observedAt,
+                        $sourceUrl, $domain, $observedAt, $strength, $quality,
                     );
                     break;
                 }
@@ -109,7 +120,7 @@ final class EvidenceExtractor
                 $evidence[] = new EvidenceItem(
                     EvidenceItem::TYPE_PRODUCT,
                     'Source text mentions "'.$kw.'".',
-                    $sourceUrl, $domain, $observedAt,
+                    $sourceUrl, $domain, $observedAt, $strength, $quality,
                 );
             }
         }
@@ -124,7 +135,7 @@ final class EvidenceExtractor
                 $evidence[] = new EvidenceItem(
                     EvidenceItem::TYPE_ONLINE_SELLING,
                     'Source contains an online-selling indicator ("'.trim($signal, '/').'").',
-                    $sourceUrl, $domain, $observedAt,
+                    $sourceUrl, $domain, $observedAt, $strength, $quality,
                 );
                 break;
             }
@@ -138,7 +149,7 @@ final class EvidenceExtractor
                 $evidence[] = new EvidenceItem(
                     EvidenceItem::TYPE_SHIPPING,
                     'Source mentions shipping/delivery ("'.trim($signal).'"). This is a mention only — no shipping volume or coverage is claimed.',
-                    $sourceUrl, $domain, $observedAt,
+                    $sourceUrl, $domain, $observedAt, $strength, $quality,
                 );
                 break;
             }
@@ -151,11 +162,11 @@ final class EvidenceExtractor
                 EvidenceItem::TYPE_SOCIAL_PRESENCE,
                 'A public social/business profile link was found: '.$profile,
                 $sourceUrl, $domain, $observedAt,
+                EvidenceStrength::Corroborating, SourceQuality::BusinessProfile,
             );
         }
 
         // ── assemble ─────────────────────────────────────────────
-        $ownDomain = ! $this->isSocialHost($domain) && ! $this->isAggregator($domain);
         $website = $ownDomain ? ($page->url ?? $primaryResult->url) : null;
 
         $name = $this->resolveName($page, $primaryResult, $domain);

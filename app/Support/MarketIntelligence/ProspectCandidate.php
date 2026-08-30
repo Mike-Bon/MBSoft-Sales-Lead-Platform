@@ -44,6 +44,22 @@ final readonly class ProspectCandidate
         public string $recommendedNextStep,
     ) {}
 
+    /**
+     * V2.2: a copy with extra evidence appended (qualification's bounded
+     * additional research — spec §18). Immutable; nothing else changes.
+     *
+     * @param  list<EvidenceItem>  $items
+     */
+    public function withAdditionalEvidence(array $items): self
+    {
+        return new self(
+            $this->name, $this->website, $this->domain, $this->location, $this->category,
+            $this->observedProducts, $this->onlineSellingEvidence, $this->shippingEvidence,
+            $this->socialPresence, array_values(array_merge($this->evidence, $items)),
+            $this->missing, $this->confidence, $this->recommendedNextStep,
+        );
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {

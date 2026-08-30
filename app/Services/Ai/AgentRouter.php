@@ -67,12 +67,14 @@ final class AgentRouter
     ];
 
     /**
-     * V2.1: external prospect discovery. Deliberately specific phrasing
-     * about finding NEW businesses/companies "out there" — checked
-     * first, and it never matches an internal-CRM question (which
-     * refers to "my leads", "our pipeline", a named account, etc.).
+     * V2.1 + V2.2: external prospect discovery and qualification.
+     * Deliberately specific phrasing about finding / evaluating NEW
+     * businesses "out there" — checked first, and it never matches an
+     * internal-CRM question (which refers to "my leads", "our pipeline",
+     * a named account, etc.).
      */
     private const MARKET_INTELLIGENCE_KEYWORDS = [
+        // V2.1 — discovery
         'find businesses', 'find companies', 'find me businesses', 'find me companies',
         'businesses in ', 'companies in ', 'businesses selling', 'companies selling',
         'businesses that sell', 'companies that sell', 'businesses that appear', 'companies that appear',
@@ -80,6 +82,13 @@ final class AgentRouter
         'find potential customer', 'find potential client', 'potential courier customer',
         'discover prospect', 'prospect discovery', 'market research', 'market intelligence',
         'find target companies', 'find new businesses', 'find shops', 'find stores',
+        // V2.2 — qualification
+        'qualify prospect', 'qualify these', 'qualify the ', 'qualify candidates',
+        'qualify the businesses', 'qualify those', 'prospect qualification',
+        'qualification of prospects', 'do these businesses match', 'does this prospect match',
+        'do these prospects match', 'which of these are a strong match', 'which of these match',
+        'against my criteria', 'against these criteria', 'against the criteria',
+        'hard criteria', 'evidence-based qualification', 'how well do these match',
     ];
 
     public function route(string $message): AgentIdentifier

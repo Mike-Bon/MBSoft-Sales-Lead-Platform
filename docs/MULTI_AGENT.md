@@ -15,9 +15,9 @@ identical tool-enforced authorization.
 > **Later additions.** Phase 9 shipped three agents; Phase 12 added a
 > fourth (**Cost-to-Serve Intelligence** — see `docs/COST_TO_SERVE.md`),
 > Phase 13 a fifth (**Business Development** — see
-> `docs/BUSINESS_DEVELOPMENT.md`), and V2.1 a sixth (**Market
-> Intelligence** — external prospect discovery, see
-> `docs/MARKET_INTELLIGENCE.md`). Each is the same single `Agent`
+> `docs/BUSINESS_DEVELOPMENT.md`), and V2.1/V2.2 a sixth (**Market
+> Intelligence** — external prospect discovery and evidence-based
+> qualification, see `docs/MARKET_INTELLIGENCE.md`). Each is the same single `Agent`
 > engine with a different `AgentDefinition` — no orchestrator, no
 > swarm, no agent-to-agent calls were added. Everything below about the
 > engine, routing, `AgentPromptRules`, the audit trail, and the

@@ -39,6 +39,7 @@ use App\Services\Ai\Tools\IdentifyMissingInformationTool;
 use App\Services\Ai\Tools\IdentifyRevenueExceptionsTool;
 use App\Services\Ai\Tools\IdentifyStaleLeadsTool;
 use App\Services\Ai\Tools\PrioritizeLeadsTool;
+use App\Services\Ai\Tools\QualifyProspectsTool;
 use App\Services\Ai\Tools\SearchKnowledgeTool;
 use App\Services\Ai\Tools\SearchLeadsTool;
 use App\Services\Ai\Tools\SearchOpportunitiesTool;
@@ -223,21 +224,24 @@ class AppServiceProvider extends ServiceProvider
                     allowedWorkflows: [],
                     maxToolIterations: $maxIterations,
                 ),
-                // V2.1: the Market Intelligence agent — external prospect
-                // discovery only. Same single Agent engine; its entire
-                // ToolRegistry is discover_prospects + a scoped
+                // V2.1 + V2.2: the Market Intelligence agent — external
+                // prospect discovery AND qualification only. Same single
+                // Agent engine; its entire ToolRegistry is
+                // discover_prospects + qualify_prospects + a scoped
                 // search_knowledge. NO CRM read/write tool, NO draft/send
-                // tool, NO Cost-to-Serve tool, NO raw-query tool — the
-                // structural boundary between hostile external content
-                // and every internal capability. Manager + Team Head
-                // only. No workflow. See docs/MARKET_INTELLIGENCE.md.
+                // tool, NO Cost-to-Serve tool, NO raw-query tool, NO
+                // numeric-scoring tool — the structural boundary between
+                // hostile external content and every internal capability.
+                // Manager + Team Head only. No workflow. See
+                // docs/MARKET_INTELLIGENCE.md.
                 new AgentDefinition(
                     identifier: AgentIdentifier::MarketIntelligence,
                     name: AgentIdentifier::MarketIntelligence->label(),
-                    purpose: 'External prospect discovery from public web sources — candidate businesses with evidence, no CRM or scoring.',
+                    purpose: 'External prospect discovery and evidence-based qualification from public web sources — no CRM, no scoring, no contact.',
                     systemPrompt: MarketIntelligenceAgentPrompt::text(),
                     tools: new ToolRegistry([
                         $app->make(DiscoverProspectsTool::class),
+                        $app->make(QualifyProspectsTool::class),
                         new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
                             KnowledgeType::SalesPlaybook,
                             KnowledgeType::ProductGuide,

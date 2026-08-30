@@ -45,8 +45,7 @@ final class ProspectDiscoveryService
      */
     public function discover(User $actor, DiscoveryCriteria $criteria): array
     {
-        $config = config('services.market_intelligence');
-        $perHour = (int) ($config['max_discoveries_per_hour'] ?? 12);
+        $perHour = (int) (config('services.market_intelligence.max_discoveries_per_hour') ?? 12);
         $key = 'market-intel:discover:'.$actor->id;
 
         if (RateLimiter::tooManyAttempts($key, $perHour)) {
@@ -57,6 +56,48 @@ final class ProspectDiscoveryService
         }
         RateLimiter::hit($key, 3600);
 
+        $gathered = $this->gather($criteria);
+
+        if ($gathered['status'] === 'provider_unavailable') {
+            return $this->result('provider_unavailable', $criteria, $gathered['queries'], $gathered['provider_failures'], 0, [
+                'message' => 'The external search service is currently unavailable. No prospects could be researched.',
+            ]);
+        }
+
+        /** @var list<ProspectCandidate> $prospects */
+        $prospects = $gathered['candidates'];
+        $status = $prospects === [] ? 'no_results' : 'ok';
+
+        AuditLogger::record('market_intelligence.discovery', $actor, [
+            'criteria' => $criteria->toArray(),
+            'provider' => $this->search->name(),
+            'queries' => count($gathered['queries']),
+            'sources_examined' => $gathered['sources_examined'],
+            'result_count' => count($prospects),
+            'provider_failures' => count($gathered['provider_failures']),
+            'status' => $status,
+        ]);
+
+        return $this->result($status, $criteria, $gathered['queries'], $gathered['provider_failures'], $gathered['sources_examined'], [
+            'prospects' => array_map(fn (ProspectCandidate $c) => $c->toArray(), $prospects),
+            'message' => $prospects === []
+                ? 'No candidate businesses with supporting evidence were found for these criteria. Try broadening the location or product terms.'
+                : null,
+        ]);
+    }
+
+    /**
+     * The shared search → group → fetch → extract pipeline, WITHOUT
+     * rate-limiting or auditing (those belong to the tool-facing entry
+     * points). V2.2's ProspectQualificationService reuses this so
+     * qualification never invents a candidate or opens a second search
+     * pipeline (spec §3/§5).
+     *
+     * @return array{status: string, candidates: list<ProspectCandidate>, queries: list<string>, provider_failures: list<array<string, string>>, sources_examined: int}
+     */
+    public function gather(DiscoveryCriteria $criteria): array
+    {
+        $config = config('services.market_intelligence');
         $queries = $this->buildQueries($criteria, (int) ($config['max_searches'] ?? 3));
         $perQuery = max(3, min(10, (int) ($config['results_per_search'] ?? 8)));
 
@@ -74,18 +115,12 @@ final class ProspectDiscoveryService
         }
 
         if ($hits === [] && $providerFailures !== []) {
-            return $this->result('provider_unavailable', $criteria, $queries, $providerFailures, 0, [
-                'message' => 'The external search service is currently unavailable. No prospects could be researched.',
-            ]);
+            return ['status' => 'provider_unavailable', 'candidates' => [], 'queries' => $queries, 'provider_failures' => $providerFailures, 'sources_examined' => 0];
         }
 
-        [$byDomain, $sourcesExamined] = $this->groupAndFetch(
-            $hits,
-            $criteria,
-            (int) ($config['max_fetches'] ?? 12),
-        );
+        [$byDomain, $sourcesExamined] = $this->groupAndFetch($hits, $criteria, (int) ($config['max_fetches'] ?? 12));
 
-        $prospects = [];
+        $candidates = [];
         foreach ($byDomain as $domain => $bucket) {
             $candidate = $this->extractor->build($criteria, $domain, $bucket['results'], $bucket['page']);
 
@@ -95,30 +130,13 @@ final class ProspectDiscoveryService
                 continue;
             }
 
-            $prospects[] = $candidate;
-            if (count($prospects) >= $criteria->maxResults) {
+            $candidates[] = $candidate;
+            if (count($candidates) >= $criteria->maxResults) {
                 break;
             }
         }
 
-        $status = $prospects === [] ? 'no_results' : 'ok';
-
-        AuditLogger::record('market_intelligence.discovery', $actor, [
-            'criteria' => $criteria->toArray(),
-            'provider' => $this->search->name(),
-            'queries' => count($queries),
-            'sources_examined' => $sourcesExamined,
-            'result_count' => count($prospects),
-            'provider_failures' => count($providerFailures),
-            'status' => $status,
-        ]);
-
-        return $this->result($status, $criteria, $queries, $providerFailures, $sourcesExamined, [
-            'prospects' => array_map(fn (ProspectCandidate $c) => $c->toArray(), $prospects),
-            'message' => $prospects === []
-                ? 'No candidate businesses with supporting evidence were found for these criteria. Try broadening the location or product terms.'
-                : null,
-        ]);
+        return ['status' => 'ok', 'candidates' => $candidates, 'queries' => $queries, 'provider_failures' => $providerFailures, 'sources_examined' => $sourcesExamined];
     }
 
     /**

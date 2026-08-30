@@ -10,6 +10,11 @@ namespace App\Support\MarketIntelligence;
  *
  * `summary` is a short factual restatement of what the source showed —
  * never an inference, never a claim the source did not make.
+ *
+ * V2.2 (spec §11/§20) adds two OPTIONAL classifications used by
+ * qualification: `strength` (how strongly this item supports a claim)
+ * and `sourceQuality` (what kind of source it came from). They default
+ * to null so every V2.1 construction site stays valid unchanged.
  */
 final readonly class EvidenceItem
 {
@@ -27,15 +32,31 @@ final readonly class EvidenceItem
 
     public const TYPE_DESCRIPTION = 'description';
 
+    public const TYPE_MARKETPLACE = 'marketplace';
+
+    public const TYPE_CONTRADICTION = 'contradiction';
+
     public function __construct(
         public string $type,
         public string $summary,
         public string $sourceUrl,
         public string $sourceDomain,
         public string $observedAt,
+        public ?EvidenceStrength $strength = null,
+        public ?SourceQuality $sourceQuality = null,
     ) {}
 
-    /** @return array<string, string> */
+    public function withStrength(EvidenceStrength $strength): self
+    {
+        return new self($this->type, $this->summary, $this->sourceUrl, $this->sourceDomain, $this->observedAt, $strength, $this->sourceQuality);
+    }
+
+    public function withSourceQuality(SourceQuality $quality): self
+    {
+        return new self($this->type, $this->summary, $this->sourceUrl, $this->sourceDomain, $this->observedAt, $this->strength, $quality);
+    }
+
+    /** @return array<string, string|null> */
     public function toArray(): array
     {
         return [
@@ -44,6 +65,8 @@ final readonly class EvidenceItem
             'source_url' => $this->sourceUrl,
             'source_domain' => $this->sourceDomain,
             'observed_at' => $this->observedAt,
+            'strength' => $this->strength?->value,
+            'source_quality' => $this->sourceQuality?->value,
         ];
     }
 }

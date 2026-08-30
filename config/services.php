@@ -211,6 +211,17 @@ return [
         'fetch_timeout' => env('MARKET_INTELLIGENCE_FETCH_TIMEOUT', 8),
         // Per-user discovery calls allowed per rolling hour.
         'max_discoveries_per_hour' => env('MARKET_INTELLIGENCE_MAX_PER_HOUR', 12),
+
+        // ── V2.2: Prospect Qualification & Evidence ────────────────
+        // Max businesses one qualification call evaluates.
+        'max_qualification_prospects' => env('MARKET_INTELLIGENCE_MAX_QUALIFY_PROSPECTS', 8),
+        // Batch-wide cap on ADDITIONAL searches done while qualifying
+        // (only for unresolved hard criteria) — spec §18.
+        'max_qualification_searches' => env('MARKET_INTELLIGENCE_MAX_QUALIFY_SEARCHES', 6),
+        // Batch-wide cap on additional page fetches while qualifying.
+        'max_qualification_fetches' => env('MARKET_INTELLIGENCE_MAX_QUALIFY_FETCHES', 8),
+        // Per-user qualification calls allowed per rolling hour.
+        'max_qualifications_per_hour' => env('MARKET_INTELLIGENCE_MAX_QUALIFY_PER_HOUR', 12),
     ],
 
 ];

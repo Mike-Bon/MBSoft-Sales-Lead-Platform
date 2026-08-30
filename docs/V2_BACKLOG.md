@@ -10,9 +10,13 @@ per CLAUDE.md's phase discipline.
 > Market Intelligence & Prospect Discovery"). "External
 > prospecting/enrichment systems" and "a new AI-agent role" below were
 > Phase-11-era exclusions; V2 explicitly reopened external prospect
-> **discovery**. **V2.1 — External Prospect Discovery** is now built (a
-> sixth, isolated `MarketIntelligence` agent — `docs/MARKET_INTELLIGENCE.md`).
-> V2.2–V2.6 remain not started and still require explicit go-ahead.
+> **discovery** and **qualification**. Built so far (a sixth, isolated
+> `MarketIntelligence` agent — `docs/MARKET_INTELLIGENCE.md`):
+> **V2.1 — External Prospect Discovery** and **V2.2 — Prospect
+> Qualification & Evidence** (deterministic non-numeric outcome, hard vs
+> supporting criteria, evidence strength, bounded additional research;
+> no CRM, no score, no outreach, no new table). V2.3–V2.6 remain not
+> started and still require explicit go-ahead.
 
 ## Explicitly out of scope per Phase 11's instruction
 
