@@ -118,9 +118,11 @@ class MarketIntelligenceQualificationInjectionTest extends TestCase
     {
         $definition = app(AgentRegistry::class)->get(AgentIdentifier::MarketIntelligence);
 
-        // V2.3 adds score_prospects — still exactly four tools, none of
-        // which write, send, query the database, or reach the CRM/CtS.
-        $this->assertCount(4, $definition->tools->definitions());
+        // V2.3 adds score_prospects, V2.4 adds check_prospect_duplicates
+        // (the only CRM-reaching tool) — still exactly five tools, none
+        // of which write, send, query the database, or run an
+        // unrestricted CRM search.
+        $this->assertCount(5, $definition->tools->definitions());
 
         foreach ($definition->tools->definitions() as $tool) {
             foreach (['sql', 'query', 'raw', 'create', 'update', 'delete', 'assign', 'send', 'draft', 'close', 'convert'] as $forbidden) {

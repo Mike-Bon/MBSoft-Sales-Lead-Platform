@@ -134,33 +134,33 @@ class AgentRegistryTest extends TestCase
     }
 
     /**
-     * V2.1 + V2.2 + V2.3: the sixth agent's own tool set — external
-     * prospect discovery, qualification, and prioritisation scoring only.
-     * discover_prospects + qualify_prospects + score_prospects + a scoped
-     * search_knowledge, and NOTHING that touches the CRM, communications,
-     * performance, or Cost-to-Serve. The absent tools below are the
-     * structural boundary between hostile external web content and every
-     * internal capability.
+     * V2.1–V2.4: the sixth agent's own tool set — external prospect
+     * discovery, qualification, prioritisation scoring, and a single
+     * narrow read-only CRM duplicate check. discover_prospects +
+     * qualify_prospects + score_prospects + check_prospect_duplicates + a
+     * scoped search_knowledge, and NOTHING that runs an unrestricted CRM
+     * search, writes to the CRM, touches communications, performance, or
+     * Cost-to-Serve. The absent tools below are the structural boundary.
      */
     public function test_market_intelligence_agent_has_the_documented_tool_set_and_no_others(): void
     {
         $tools = app(AgentRegistry::class)->get(AgentIdentifier::MarketIntelligence)->tools;
 
-        foreach (['discover_prospects', 'qualify_prospects', 'score_prospects', 'search_knowledge'] as $tool) {
+        foreach (['discover_prospects', 'qualify_prospects', 'score_prospects', 'check_prospect_duplicates', 'search_knowledge'] as $tool) {
             $this->assertNotNull($tools->find($tool), "Market Intelligence Agent is missing {$tool}.");
         }
 
-        $this->assertCount(4, $tools->definitions(), 'Market Intelligence Agent must have exactly four tools.');
+        $this->assertCount(5, $tools->definitions(), 'Market Intelligence Agent must have exactly five tools.');
 
         foreach ([
-            'search_leads', 'get_lead', 'search_opportunities', 'get_opportunity',
+            'search_leads', 'get_lead', 'search_opportunities', 'get_opportunity', 'search_contacts', 'get_contact',
             'get_followups', 'get_communication_history', 'get_pipeline_summary',
             'get_my_performance', 'get_team_performance',
             'draft_email', 'draft_whatsapp', 'send_email', 'send_whatsapp',
             'prioritize_leads', 'identify_stale_leads', 'analyze_account',
             'get_customer_revenue_summary', 'get_customer_engagement_summary',
             'get_revenue_concentration', 'compare_account_period', 'identify_revenue_exceptions',
-            'create_lead', 'update_lead', 'assign_lead',
+            'create_lead', 'update_lead', 'assign_lead', 'set_lead_status',
         ] as $tool) {
             $this->assertNull($tools->find($tool), "Market Intelligence Agent must not have {$tool}.");
         }

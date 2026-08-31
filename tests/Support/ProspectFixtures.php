@@ -5,9 +5,11 @@ namespace Tests\Support;
 use App\Support\MarketIntelligence\CriterionEvaluation;
 use App\Support\MarketIntelligence\CriterionKind;
 use App\Support\MarketIntelligence\CriterionResult;
+use App\Support\MarketIntelligence\CrmOrganizationIdentity;
 use App\Support\MarketIntelligence\EvidenceItem;
 use App\Support\MarketIntelligence\EvidenceStrength;
 use App\Support\MarketIntelligence\ProspectCandidate;
+use App\Support\MarketIntelligence\ProspectIdentity;
 use App\Support\MarketIntelligence\QualificationCriterion;
 use App\Support\MarketIntelligence\QualificationOutcome;
 use App\Support\MarketIntelligence\QualifiedProspect;
@@ -113,6 +115,58 @@ class ProspectFixtures
             inferences: ['Selling physical products online creates a plausible parcel-delivery requirement.'],
             missing: $missing,
             recommendation: 'Worth further business-development research.',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    public static function prospectIdentity(array $overrides = []): ProspectIdentity
+    {
+        $v = array_merge([
+            'business' => 'ABC Beauty Corporation',
+            'website' => 'https://abcbeauty.ph/',
+            'domain' => 'abcbeauty.ph',
+            'location' => 'Cebu City, Philippines',
+            'public_profiles' => [],
+        ], $overrides);
+
+        return new ProspectIdentity(
+            business: $v['business'],
+            website: $v['website'],
+            domain: $v['domain'],
+            location: $v['location'],
+            publicProfiles: $v['public_profiles'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    public static function crmOrganization(array $overrides = []): CrmOrganizationIdentity
+    {
+        $v = array_merge([
+            'id' => 1,
+            'name' => 'ABC Beauty Corp.',
+            'website' => 'https://www.abcbeauty.ph/',
+            'email' => null,
+            'city' => 'Cebu City',
+            'state_province' => null,
+            'country' => 'Philippines',
+            'has_lead' => false,
+            'has_opportunity' => false,
+        ], $overrides);
+
+        return new CrmOrganizationIdentity(
+            id: $v['id'],
+            name: $v['name'],
+            website: $v['website'],
+            email: $v['email'],
+            city: $v['city'],
+            stateProvince: $v['state_province'],
+            country: $v['country'],
+            hasLead: $v['has_lead'],
+            hasOpportunity: $v['has_opportunity'],
         );
     }
 }

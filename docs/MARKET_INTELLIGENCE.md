@@ -1,12 +1,14 @@
-# Market Intelligence — Discovery, Qualification & Scoring (V2.1 + V2.2 + V2.3)
+# Market Intelligence — Discovery, Qualification, Scoring & Duplicate Detection (V2.1–V2.4)
 
 Authoritative reference for the Market Intelligence capability. If this
 document and the code disagree, the code is a bug against this document.
 The V2.1 sections below are unchanged; V2.2 adds
-[**Prospect Qualification & Evidence**](#prospect-qualification--evidence-v22)
-and V2.3 adds
+[**Prospect Qualification & Evidence**](#prospect-qualification--evidence-v22),
+V2.3 adds
 [**Transparent Prospect Lead Scoring**](#transparent-prospect-lead-scoring-v23),
-both near the end.
+and V2.4 adds
+[**CRM Duplicate Detection**](#crm-duplicate-detection-v24) — the first
+and only Market Intelligence capability with any CRM reach.
 
 **What V2.1 is.** A Manager or a Team Head asks the assistant, in plain
 language, to find candidate businesses from public web sources ("Find
@@ -23,18 +25,22 @@ confidence band, and a recommended next research step.
 - V2.1's `discovery_confidence` is a coarse `low` / `medium` / `high`
   band from how much corroborating evidence exists — never a
   model-produced number, and distinct from the V2.3 score.
-- No CRM duplicate detection (V2.4). Discovery reads **no** CRM data.
+- Discovery / qualification / scoring read **no** CRM data. V2.4's
+  `check_prospect_duplicates` is the only tool with CRM reach.
 - No CRM writes and no lead conversion (V2.5). A candidate is a research
   result, not a Lead/Account/Opportunity/Contact, and nothing here
   creates one.
 - No outreach, no messaging.
 
-> **V2.2 + V2.3 update.** Qualification and transparent prioritisation
-> scoring are now built — see the dedicated sections below. They still
-> add **no** CRM access, **no** conversion/revenue prediction, **no**
-> outreach, and **no** new agent; they are the second and third tools on
-> the same isolated Market Intelligence agent. The score is computed by
-> the application from config weights, never by the model.
+> **V2.2 – V2.4 update.** Qualification, transparent prioritisation
+> scoring, and CRM duplicate detection are now built — see the dedicated
+> sections below. Together they still add **no** CRM *write*, **no**
+> unrestricted CRM search, **no** conversion/revenue prediction, **no**
+> outreach, and **no** new agent; they are the second, third, and fourth
+> tools on the same isolated Market Intelligence agent. The qualification
+> outcome, the score, and the duplicate status are all computed by the
+> application from config, never by the model. V2.4's CRM read is
+> narrow, read-only, and always `scopeToUser`-scoped.
 
 ## Architecture
 
@@ -895,3 +901,311 @@ version returned), `MarketIntelligenceScoringInjectionTest` (page cannot
 self-score / self-prioritise / change weights / trigger CRM / mutate the
 prompt). Doubles: `FakeSearchProvider`, `ProspectFixtures`
 (`criterion` / `evaluation` / `qualified` builders). No live network.
+
+---
+
+# CRM Duplicate Detection (V2.4)
+
+**What V2.4 is.** After a prospect is discovered → qualified → scored,
+V2.4 answers *"does this external prospect already exist, or probably
+exist, in the CRM records I am authorised to see?"* — deterministically,
+transparently, and **without ever touching the web again or changing the
+score**.
+
+Example: external prospect *ABC Beauty Corporation* / `abcbeauty.ph`
+(score 84, HIGH) against a CRM organisation *ABC Beauty Corp.* /
+`https://www.abcbeauty.ph/` → **EXACT DUPLICATE**, match reasons:
+✓ normalised domain exact match, ✓ normalised business-name match.
+
+**What V2.4 is NOT.** No CRM *write* of any kind. No lead / opportunity /
+activity / communication / assignment / status change (that is V2.5). No
+unrestricted CRM search (`search_leads` / `get_lead` / `search_accounts`
+were **not** added). No Cost-to-Serve. No outreach. No new agent, no
+orchestrator. No new database table, no migration. No general CRM
+de-duplication project — internal CRM duplicates are surfaced as
+candidates but never merged, deleted, or edited (spec §19).
+
+## V2.4 architecture
+
+The **first widening of the Market Intelligence ↔ CRM boundary**, done
+minimally: one narrow, read-only tool — `check_prospect_duplicates` — on
+the same isolated `MarketIntelligence` agent (now 5 tools:
+`discover_prospects` + `qualify_prospects` + `score_prospects` +
+`check_prospect_duplicates` + scoped `search_knowledge`).
+
+```
+check_prospect_duplicates (Manager / Team Head only, re-checked from the actor)
+  │  identity list: [{ business, website, domain, location, + pass-through score fields }]
+  │  — exactly the `identity` block from score_prospects. NO discovery /
+  │    qualification / scoring is re-run (spec §6). NO web I/O.
+  ▼
+CheckProspectDuplicatesTool  →  ProspectDuplicateCheckService::check()
+  ├─ RateLimiter  ('market-intel:duplicate-check:{id}', hourly)
+  ├─ per prospect (≤ max_prospects_per_check):
+  │    ├─ ProspectIdentity::fromArray()      (normalise; skip if too thin)
+  │    ├─ authorisedCandidates()  ── the ONLY CRM read:
+  │    │     scopeToUser(Organization::query(), $actor)               ← server-side, BEFORE execution
+  │    │       ->withCount(['leads','opportunities'])
+  │    │       ->where(lower(website) LIKE %host% OR lower(name) LIKE %token% …)
+  │    │       ->limit(candidate_scan_cap)                            ← bounded, no full-CRM scan
+  │    │     → list<CrmOrganizationIdentity>   (id, name, website, email, city/state/country only)
+  │    │     try/catch → on failure: check_status = 'unavailable'  (NOT no_match — spec §33)
+  │    └─ ProspectDuplicateMatcher::match()   ── PURE: no DB, no network, no LLM
+  └─ AuditLogger 'market_intelligence.duplicate_check'
+```
+
+`ProspectDuplicateMatcher` is the pure core: it is handed
+already-authorised `CrmOrganizationIdentity` value objects and compares
+identity fields. It cannot reach a restricted record, the web, or the
+LLM. `ProspectDuplicateCheckServiceTest` and
+`CheckProspectDuplicatesToolTest` bind a throwing `SearchProvider` +
+`Http::preventStrayRequests()` to prove the no-network guarantee.
+
+**Trade-off (spec §6).** `check_prospect_duplicates` does **not** replay
+`discover → qualify → score`. It consumes the identity structure the
+model already has from `score_prospects`. The V2.3 `total_score` /
+`priority` / `qualification_outcome` / `scoring_model` are accepted as
+optional pass-through fields and echoed back verbatim under
+`carried_from_scoring` — V2.4 never recomputes them. If the model
+provides no score fields, the duplicate result stands on its own
+(duplicate status is independent of the score).
+
+### Key classes (V2.4)
+
+| Class | Responsibility |
+|---|---|
+| `App\Services\Ai\Tools\CheckProspectDuplicatesTool` | The tool; Manager/Team-Head re-check; identity-list input; no pipeline. |
+| `App\Support\MarketIntelligence\IdentityNormalizer` | Deterministic conservative host / website / name normalization + token Dice/subset. |
+| `App\Support\MarketIntelligence\ProspectIdentity` | Normalised prospect identity + opaque pass-through score fields. |
+| `App\Support\MarketIntelligence\CrmOrganizationIdentity` | The minimal identity slice of one authorised CRM organisation. |
+| `App\Support\MarketIntelligence\MatchSignal` | One transparent match reason with both compared values. |
+| `App\Support\MarketIntelligence\DuplicateStatus` | `exact_duplicate` \| `likely_duplicate` \| `possible_duplicate` \| `no_match`. |
+| `App\Support\MarketIntelligence\DuplicateMatchPolicy` | Config-backed thresholds + version; validated with fallback. |
+| `App\Support\MarketIntelligence\DuplicateCandidate` | One matched CRM org: id, name, website, `classification`, `match_strength`, signals, `crm_linkage`. |
+| `App\Support\MarketIntelligence\DuplicateCheckedProspect` | The per-prospect result: `check_status`, `duplicate_status`, candidates, `scope_note`, `next_action`, carried score. |
+| `App\Services\MarketIntelligence\ProspectDuplicateMatcher` | The PURE matcher (identity + CRM identities + policy → status + candidates). |
+| `App\Services\MarketIntelligence\ProspectDuplicateCheckService` | The bounded shell: scoped CRM read + rate-limit + audit. |
+
+## V1 CRM identity source of truth
+
+Business identity lives on the **`organizations`** table: `name`
+(unique), `website`, `email`, `phone`, `address`, `city`,
+`state_province`, `country`, plus `owner_id` / `team_id` for scoping.
+Leads attach to an organisation (`leads.organization_id`). V2.4 matches
+the prospect against **organisations** (a prospect "already exists" when
+its business is a CRM organisation, lead or not) and reports whether the
+matched org already has a lead / opportunity via a boolean
+`crm_linkage`. Fields V2.4 does **not** read: `notes`, `phone`
+(the prospect side has none), any lead/opportunity/activity/
+communication detail.
+
+## The narrow CRM read boundary
+
+- **One query shape only:** a `SELECT` of identity columns from
+  `organizations`, `withCount(['leads','opportunities'])`, filtered by
+  `lower(website) LIKE %host%` / `lower(name) LIKE %token%`, ordered by
+  `id`, `LIMIT candidate_scan_cap`.
+- **Always `ScopesCrmQueries::scopeToUser()` first** — the identical
+  primitive every V1 CRM index page and CRM AgentTool uses (Manager
+  unrestricted; Team Head / Member: `team_id = own team` OR
+  `team_id IS NULL AND owner_id = self`). It is applied to the builder
+  **before** execution, so out-of-scope rows are never fetched into PHP.
+- **No raw SQL exposed**, no arbitrary query, no `team_id` / `owner_id`
+  parameter on the tool.
+
+## Authorization
+
+| Role | Duplicate-check scope |
+|---|---|
+| Manager | Every organisation in the CRM. `scope_note`: "Checked every organisation in the CRM." |
+| Team Head | Only organisations in their team scope. `scope_note` says records under other teams were not examined; a `no_match` explicitly states it is **not** a guarantee the business is absent org-wide. |
+| Team Member | No Market Intelligence access at all; the tool also re-checks `isManager() || isTeamHead()` and throws `AuthorizationException`. |
+
+## Restricted-record non-disclosure (spec §9)
+
+Because `scopeToUser()` runs before the query executes, a perfect
+duplicate that belongs only to another team is:
+
+- never fetched, so never a `candidate_match`;
+- not counted in `candidates_examined` (which only ever counts scoped
+  rows);
+- never named in the output or in the audit metadata (the audit records
+  counts + policy version only — no record names);
+- unable to change the `duplicate_status` (it stays `no_match`).
+
+The query is scoped and bounded identically whether or not a restricted
+match exists, so there is no timing/'count' oracle.
+`ProspectDuplicateCheckServiceTest::test_a_restricted_duplicate_under_another_team_is_invisible_to_a_team_head`
+and `MarketIntelligenceDuplicateInjectionTest::test_the_model_cannot_widen_scope_to_another_team`
+pin this.
+
+## Identity normalization (`IdentityNormalizer`, spec §11)
+
+- **Host:** lowercase, strip scheme, strip `www.`, drop path/query;
+  `https://www.ABCBeauty.ph/products?x=1` → `abcbeauty.ph`. Subdomains
+  are **kept** (`shop.abcbeauty.ph` ≠ `abcbeauty.ph`) — conservative.
+  Matches the existing MI `registrableDomain()` behaviour.
+- **Website:** host + path, trailing slash removed, scheme/query dropped.
+- **Name:** lowercase, punctuation → space, whitespace collapsed, then
+  **only trailing** legal-form tokens removed (`inc`, `incorporated`,
+  `corp`, `corporation`, `co`, `company`, `ltd`, `limited`, `llc`,
+  `plc`, `group`, `holdings`, …). `"ABC Beauty Corp., Inc."` →
+  `"abc beauty"`. `"ABC Trading"` and `"ABC Trading Solutions"` stay
+  distinct.
+- **Distinctive tokens:** name tokens minus a generic list (`shop`,
+  `store`, `online`, `trading`, `services`, `solutions`, `philippines`,
+  `cebu`, `manila`, `city`, …) — used for generic-name protection.
+
+## Matching signals (spec §10)
+
+| Signal | Strength | Fires when |
+|---|---|---|
+| `domain_exact` | strong | normalised prospect host == normalised CRM website host |
+| `website_exact` | moderate | full normalised website (with path) also matches |
+| `name_exact` | strong / supporting | normalised name key equal (supporting if the name is generic) |
+| `name_fuzzy` | moderate | not exact, but token Dice ≥ `fuzzy_name_dice_threshold` **or** every distinctive token of the shorter name is in the longer — and both names have ≥ `min_distinctive_name_tokens` distinctive tokens |
+| `email_domain` | moderate | CRM organisation email domain == prospect host |
+| `location` | supporting | prospect location shares a ≥ 4-char token with the CRM org city/state/country |
+
+Fuzzy matching is deterministic **Sørensen–Dice over normalised tokens**
+— no LLM, no embeddings, no new dependency. Exact domain always
+outweighs a fuzzy name.
+
+## Generic-name protection (spec §13)
+
+A name whose distinctive-token count is below
+`min_distinctive_name_tokens` (default 2) is "generic". A generic
+`name_exact` is downgraded to a *supporting* signal and can never on its
+own reach `LIKELY`/`EXACT` — it needs a domain match. *"Online Store"*
+matching *"Online Store"* + shared city is at most a weak `POSSIBLE`.
+
+## Duplicate-status decision table (spec §14)
+
+Per CRM record, from the signal set (`has(x)` = signal present):
+
+```
+domain_exact && name_compatible                        → EXACT_DUPLICATE
+domain_exact                                           → LIKELY_DUPLICATE   (domain match, name absent/mismatched)
+name_exact (distinctive) && corroborated               → LIKELY_DUPLICATE
+name_exact (distinctive)                               → POSSIBLE_DUPLICATE
+name_fuzzy (distinctive)                               → POSSIBLE_DUPLICATE
+name_exact (any) && corroborated                       → POSSIBLE_DUPLICATE  (generic name + location/email)
+otherwise                                              → not a candidate
+```
+
+`name_compatible` = a name signal fired **or** the prospect gave no
+name. `corroborated` = `website_exact` **or** `email_domain` **or**
+`location`. The **overall** `duplicate_status` for a prospect is the
+strongest candidate's classification, or `no_match` when there are none.
+
+## `match_strength` — internal ordering only (spec §15)
+
+An internal 0–100 integer (`domain_exact` 60, `website_exact` +10,
+distinctive `name_exact` 30 / generic 10, `name_fuzzy` 18,
+`email_domain` 12, `location` 6, capped at 100). It orders candidates
+within a prospect and **nothing else**. It is not, and never appears
+as, the V2.3 `total_score`, `priority`, or `lead_score` — those live
+only under `carried_from_scoring` and are never modified.
+
+## Candidate & batch limits (spec §18, §30)
+
+| Limit | Config key | Default |
+|---|---|---|
+| Prospects per check call | `max_prospects_per_check` | 10 |
+| CRM matches surfaced per prospect | `max_candidates_per_prospect` | 5 |
+| Scoped organisations loaded per prospect | `candidate_scan_cap` | 50 |
+| Fuzzy-name Dice threshold | `fuzzy_name_dice_threshold` | 0.85 |
+| Min distinctive name tokens | `min_distinctive_name_tokens` | 2 |
+| Duplicate-check calls per user, per hour | `max_checks_per_hour` (env `MARKET_INTELLIGENCE_MAX_DUP_PER_HOUR`) | 12 |
+
+Multiple matches are returned (bounded, ordered by classification then
+`match_strength` then org id) — the tool never silently picks one.
+
+## Read-only guarantee (spec §20)
+
+`ProspectDuplicateMatcher` is a pure function (value objects in, value
+objects out). `ProspectDuplicateCheckService` issues only `SELECT`
+(`->get()`, `->withCount`). No `LeadService`, no `save()`, no
+`update()`, no `delete()`. `ProspectDuplicateCheckServiceTest::test_duplicate_checking_never_writes_to_the_crm`
+asserts `Organization::count()`, `Lead::count()`, a specific org's
+`notes`, and the org's lead count all unchanged after a check.
+
+## Matching policy / version (spec §28)
+
+`DuplicateMatchPolicy` (default `v2.4-default-1`, env
+`MI_DUP_POLICY_VERSION`) is validated on load — thresholds in range,
+caps ≥ 1 — and falls back to frozen defaults with `config_valid: false`
+(version suffixed `(invalid config — defaults applied)`) on anything
+malformed. Every result and every audit line carries `match_policy`.
+
+## Failure semantics (spec §33)
+
+| Situation | `check_status` | `duplicate_status` |
+|---|---|---|
+| CRM checked within scope | `ok` | one of exact/likely/possible/no_match |
+| Prospect identity too thin (no host, no name tokens) | `skipped` | `null` |
+| CRM query threw | `unavailable` | `null` |
+
+A failed or skipped check is **never** reported as `no_match` — "failure
+to check is not evidence that no duplicate exists". The `next_action`
+for `unavailable` explicitly says *"do NOT treat this as 'no duplicate'"*.
+
+## Audit (spec §32)
+
+One `audit`-channel event per call: `market_intelligence.duplicate_check`
+— actor, `match_policy` version, `config_valid`, `prospect_count`,
+`crm_candidates_examined` (scoped rows only), `duplicate_status_distribution`,
+`check_status_distribution`, status. **No record names, no notes, no
+webpage bodies, no secrets.** For a Team Head, `crm_candidates_examined`
+counts only in-scope records, so it cannot leak the existence of a
+restricted match.
+
+## `DuplicateCheckedProspect::toArray()` — the V2.5 hand-off contract (spec §29)
+
+```
+business, website, domain
+check_status                (ok | skipped | unavailable)
+duplicate_status            (exact_duplicate | likely_duplicate | possible_duplicate | no_match | null)
+duplicate_status_label
+candidate_matches[]  → { crm_record_type: "organization", crm_record_id, business_name,
+                         website, domain, location, classification, classification_label,
+                         match_strength, match_reasons:[{signal,strength,label,prospect_value,crm_value,detail}],
+                         crm_linkage:{has_lead,has_opportunity} }
+candidates_examined
+match_policy                (version string)
+scope_note
+next_action
+carried_from_scoring → { total_score?, priority?, qualification_outcome?, scoring_model? }   (verbatim, never recomputed)
+```
+
+V2.5 uses `duplicate_status` + `check_status` to decide:
+**EXACT / LIKELY** → warn and normally block accidental creation;
+**POSSIBLE** → require explicit human review;
+**NO_MATCH** (and `check_status: ok`) → eligible for human-confirmed CRM
+creation via the existing V1 `LeadService`; **unavailable** → do not
+proceed on the assumption of "no duplicate". V2.4 itself enforces none
+of this — it only returns the structured information.
+
+## V2.4 configuration
+
+`config('services.market_intelligence.duplicate_check')` — `policy_version`
+(env `MI_DUP_POLICY_VERSION`), `fuzzy_name_dice_threshold`,
+`min_distinctive_name_tokens`, `max_candidates_per_prospect`,
+`candidate_scan_cap`, `max_prospects_per_check`, `max_checks_per_hour`
+(env `MARKET_INTELLIGENCE_MAX_DUP_PER_HOUR`). No migration, no new table.
+
+## V2.4 testing
+
+`IdentityNormalizerTest` (host / website / name normalization edge cases,
+no over-merging), `ProspectDuplicateMatcherTest` (the pure decision
+table — exact/likely/possible/no_match, www/scheme/path equivalence,
+legal-suffix, fuzzy, generic-name protection, distinct-company
+non-match, multiple matches ordered + capped, `match_strength` is not a
+score), `ProspectDuplicateCheckServiceTest` (Manager vs Team Head scope,
+**restricted-record invisibility**, null-team record invisibility,
+read-only, `unavailable` ≠ `no_match`, skipped, score pass-through,
+hourly limit, audit safety), `CheckProspectDuplicatesToolTest` (authz,
+validation, no CRM-search/write param, no web I/O),
+`MarketIntelligenceDuplicateInjectionTest` (injected identity / CRM-note
+text inert, crafted `team_id` cannot widen scope, `create_lead` writes
+nothing, prompt immutable). No live network, no production database.

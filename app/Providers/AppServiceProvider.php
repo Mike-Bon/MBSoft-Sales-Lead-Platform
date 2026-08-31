@@ -19,6 +19,7 @@ use App\Services\Ai\Prompts\SalesAgentPrompt;
 use App\Services\Ai\Providers\AnthropicProvider;
 use App\Services\Ai\ToolRegistry;
 use App\Services\Ai\Tools\AnalyzeAccountTool;
+use App\Services\Ai\Tools\CheckProspectDuplicatesTool;
 use App\Services\Ai\Tools\CompareAccountPeriodTool;
 use App\Services\Ai\Tools\DiscoverProspectsTool;
 use App\Services\Ai\Tools\DraftEmailTool;
@@ -225,29 +226,35 @@ class AppServiceProvider extends ServiceProvider
                     allowedWorkflows: [],
                     maxToolIterations: $maxIterations,
                 ),
-                // V2.1 + V2.2 + V2.3: the Market Intelligence agent —
-                // external prospect discovery, evidence-based
-                // qualification, and transparent prioritisation scoring
-                // only. Same single Agent engine; its entire ToolRegistry
-                // is discover_prospects + qualify_prospects +
-                // score_prospects + a scoped search_knowledge. NO CRM
-                // read/write tool, NO draft/send tool, NO Cost-to-Serve
-                // tool, NO raw-query tool — the structural boundary
-                // between hostile external content and every internal
-                // capability. The score is computed by
-                // ProspectScoringService from config weights, never by
-                // the model, and score_prospects exposes no weight /
-                // threshold / priority parameter. Manager + Team Head
-                // only. No workflow. See docs/MARKET_INTELLIGENCE.md.
+                // V2.1–V2.4: the Market Intelligence agent — external
+                // prospect discovery, evidence-based qualification,
+                // transparent prioritisation scoring, and (V2.4) a
+                // single NARROW read-only CRM duplicate check. Same
+                // single Agent engine; its entire ToolRegistry is
+                // discover_prospects + qualify_prospects + score_prospects
+                // + check_prospect_duplicates + a scoped search_knowledge.
+                //
+                // check_prospect_duplicates is the ONLY tool here with
+                // any CRM reach: a bounded, ScopesCrmQueries::scopeToUser
+                // -scoped SELECT of `organizations` identity columns.
+                // Still NO unrestricted CRM search, NO CRM write / lead
+                // creation / assignment / status change, NO draft/send
+                // tool, NO Cost-to-Serve tool, NO raw-query tool, NO
+                // external web research in the matcher. Duplicate
+                // classification is computed by ProspectDuplicateMatcher
+                // from deterministic signals, never by the model, and it
+                // never mutates the V2.3 score. Manager + Team Head only.
+                // No workflow. See docs/MARKET_INTELLIGENCE.md.
                 new AgentDefinition(
                     identifier: AgentIdentifier::MarketIntelligence,
                     name: AgentIdentifier::MarketIntelligence->label(),
-                    purpose: 'External prospect discovery, evidence-based qualification, and transparent prioritisation scoring from public web sources — no CRM, no contact.',
+                    purpose: 'External prospect discovery, qualification, prioritisation scoring, and a narrow authorised CRM duplicate check — no CRM writes, no contact.',
                     systemPrompt: MarketIntelligenceAgentPrompt::text(),
                     tools: new ToolRegistry([
                         $app->make(DiscoverProspectsTool::class),
                         $app->make(QualifyProspectsTool::class),
                         $app->make(ScoreProspectsTool::class),
+                        $app->make(CheckProspectDuplicatesTool::class),
                         new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
                             KnowledgeType::SalesPlaybook,
                             KnowledgeType::ProductGuide,

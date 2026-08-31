@@ -262,6 +262,32 @@ return [
             // re-runs the bounded V2.2 qualification pipeline).
             'max_scorings_per_hour' => env('MARKET_INTELLIGENCE_MAX_SCORE_PER_HOUR', 12),
         ],
+
+        // ── V2.4: CRM Duplicate Detection ─────────────────────────
+        // The ONLY Market Intelligence capability with CRM reach — a
+        // narrow, scopeToUser-scoped read of `organizations` identity
+        // columns. Deterministic matching only; the policy is validated
+        // on load and falls back to frozen defaults. No migration, no
+        // new table. See docs/MARKET_INTELLIGENCE.md.
+        'duplicate_check' => [
+            'policy_version' => env('MI_DUP_POLICY_VERSION', 'v2.4-default-1'),
+            // Fuzzy business-name match threshold (Sørensen–Dice over
+            // normalised tokens). Exact domain always outweighs this.
+            'fuzzy_name_dice_threshold' => 0.85,
+            // A name with fewer distinctive (non-generic) tokens than
+            // this is treated as generic and needs domain corroboration
+            // to become a strong match (spec §13).
+            'min_distinctive_name_tokens' => 2,
+            // Max CRM matches surfaced per prospect (spec §18).
+            'max_candidates_per_prospect' => 5,
+            // Max scoped organisations loaded per prospect before
+            // matching — prevents an unbounded CRM scan (spec §30).
+            'candidate_scan_cap' => 50,
+            // Max prospects one duplicate-check call evaluates.
+            'max_prospects_per_check' => 10,
+            // Per-user duplicate-check calls allowed per rolling hour.
+            'max_checks_per_hour' => env('MARKET_INTELLIGENCE_MAX_DUP_PER_HOUR', 12),
+        ],
     ],
 
 ];

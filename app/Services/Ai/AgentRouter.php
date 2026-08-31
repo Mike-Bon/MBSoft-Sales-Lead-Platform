@@ -95,6 +95,11 @@ final class AgentRouter
         'prospect prioritization', 'prioritise these prospects', 'prioritize these prospects',
         'prioritise prospects', 'prioritize prospects', 'rank these prospects', 'rank the prospects',
         'rank prospects', 'priority band', 'which prospects deserve', 'which prospects should we pursue',
+        // V2.4 — CRM duplicate detection
+        'duplicate check', 'check for duplicate', 'check duplicates', 'already in the crm',
+        'already in our crm', 'already in crm', 'already a lead', 'already exist',
+        'do we already have', 'is this prospect already', 'are these prospects already',
+        'existing crm record', 'crm duplicate', 'prospect duplicate', 'de-dupe', 'dedupe',
     ];
 
     public function route(string $message): AgentIdentifier
