@@ -6,28 +6,40 @@ detail, or started — recording an item here is not authorization to
 begin it in a future session without the user's explicit go-ahead,
 per CLAUDE.md's phase discipline.
 
-> **Superseded in part by the approved V2 track** (`CLAUDE.md` "## V2 —
-> Market Intelligence & Prospect Discovery"). "External
-> prospecting/enrichment systems" and "a new AI-agent role" below were
-> Phase-11-era exclusions; V2 explicitly reopened external prospect
-> **discovery**, **qualification**, **scoring**, **CRM duplicate
-> detection**, and **human-confirmed CRM lead creation**. Built so far
-> (a sixth, isolated `MarketIntelligence` agent — five tools —
-> `docs/MARKET_INTELLIGENCE.md`): **V2.1 — External Prospect Discovery**,
-> **V2.2 — Prospect Qualification & Evidence**, **V2.3 — Transparent
-> Prospect Lead Scoring** (deterministic config-backed 100-point model;
-> never a conversion probability), **V2.4 — CRM Duplicate Detection**
-> (one narrow read-only `scopeToUser`-scoped `organizations` lookup;
-> deterministic exact/likely/possible/no_match; restricted records stay
-> invisible), and **V2.5 — Human-Confirmed CRM Lead Creation** (the AI
-> `prepare_prospect_for_crm` tool is proposal-only; the lead is written
-> by the existing V1 `LeadService`/`OrganizationService` only on an
-> explicit human "Create Lead" click, behind a content fingerprint,
-> an eligibility state machine, and a fresh CRM duplicate re-check;
-> one new table `prospect_lead_proposals`, no other schema change).
-> **V2.6** (adversarial security testing, full regression, UAT,
-> end-to-end verification, deployment-readiness docs, V2 feature freeze)
-> is not started and still requires explicit go-ahead.
+> **Superseded by the approved V2 track — now COMPLETE and FROZEN**
+> (`CLAUDE.md` "## V2 — Market Intelligence & Prospect Discovery").
+> "External prospecting/enrichment systems" and "a new AI-agent role"
+> below were Phase-11-era exclusions; V2 explicitly reopened external
+> prospect **discovery**, **qualification**, **scoring**, **CRM
+> duplicate detection**, and **human-confirmed CRM lead creation** —
+> all delivered by a sixth, isolated `MarketIntelligence` agent with
+> exactly six tools (`docs/MARKET_INTELLIGENCE.md`):
+>
+> - **V2.1 — External Prospect Discovery** ✅
+> - **V2.2 — Prospect Qualification & Evidence** ✅
+> - **V2.3 — Transparent Prospect Lead Scoring** ✅ (deterministic
+>   config-backed 100-point model; never a conversion probability)
+> - **V2.4 — CRM Duplicate Detection** ✅ (one narrow read-only
+>   `scopeToUser`-scoped `organizations` lookup; deterministic
+>   exact/likely/possible/no_match; restricted records stay invisible)
+> - **V2.5 — Human-Confirmed CRM Lead Creation** ✅ (the AI
+>   `prepare_prospect_for_crm` tool is proposal-only; the lead is
+>   written by the existing V1 `LeadService`/`OrganizationService`
+>   only on an explicit human "Create Lead" click, behind a content
+>   fingerprint, an eligibility state machine, and a fresh CRM
+>   duplicate re-check; one new table `prospect_lead_proposals`, no
+>   other schema change)
+> - **V2.6 — Security review, regression, UAT & feature freeze** ✅
+>   (adversarial security matrix, full regression at 1001 tests / 0
+>   failures, Manager/Team Head/Team Member UAT, two low-severity
+>   hardening fixes only, `docs/V2_RELEASE_READINESS.md`).
+>   **`V2 FEATURE FREEZE` is declared.**
+>
+> No further V2 feature changes before deployment / UAT sign-off
+> (release-blocking defect, security, and deployment fixes only). The
+> items below remain out of scope; anything V2-adjacent that surfaced
+> during V2.1–V2.6 and was deliberately deferred is recorded under
+> "## Deferred out of V2 (V3 / backlog)".
 
 ## Explicitly out of scope per Phase 11's instruction
 
@@ -89,3 +101,35 @@ per CLAUDE.md's phase discipline.
   credential step is currently inert (no private-registry entry exists
   in `composer.json` to consume it); worth removing or actually wiring
   up correctly next time CI is touched (`docs/PHASE_11_AUDIT.md` §5).
+
+## Deferred out of V2 (V3 / backlog)
+
+Surfaced during V2.1–V2.6, deliberately **not** built. Recording here is
+not authorization to start. Classification follows
+`docs/V2_RELEASE_READINESS.md` §14 (B = post-V2 cleanup, C =
+future-scale). None is a release blocker.
+
+- **"My pending prospect proposals" list page** (B) — a proposal is
+  currently reached only by the URL the assistant returns. A lost URL
+  means re-preparing (which supersedes the old proposal cleanly). A
+  simple owner-scoped index would be a UX nicety.
+- **`market-intelligence:prune-proposals` command** (B) — no expiry
+  sweep for `prospect_lead_proposals` (mirrors V1 `workflow_approvals`,
+  also retained after decision). `isExpired()` is the authoritative
+  gate, so stale rows are inert; this is housekeeping only.
+- **Consolidate host / registrable-domain normalisation** (B) —
+  `IdentityNormalizer` is the natural home; V2.1–V2.2 still carry small
+  private copies of the same logic.
+- **Duplicate-prefilter index for large CRMs** (C) — the
+  `lower(name) LIKE %token%` candidate prefilter is unindexed. Fine at
+  current scale (`candidate_scan_cap = 50`); a `website_host` column +
+  b-tree, or a `pg_trgm` GIN index on `organizations.name`, would help
+  at tens of thousands of organisations.
+- **Validate `proposal_ttl_hours`** (C) — an invalid value currently
+  fails safe (the proposal expires early) rather than being rejected /
+  clamped like the scoring and duplicate config.
+- **Hard MI kill-switch / feature flag** (C) — there is no single
+  config flag to disable the whole agent. Unsetting `SEARCH_PROVIDER`
+  disables discovery; a full stop currently means removing the
+  `MarketIntelligence` `AgentDefinition` (one edit) and deploying.
+  Not built in V2.6 per the "don't invent one" instruction.

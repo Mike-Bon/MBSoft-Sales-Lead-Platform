@@ -15,11 +15,12 @@ identical tool-enforced authorization.
 > **Later additions.** Phase 9 shipped three agents; Phase 12 added a
 > fourth (**Cost-to-Serve Intelligence** — see `docs/COST_TO_SERVE.md`),
 > Phase 13 a fifth (**Business Development** — see
-> `docs/BUSINESS_DEVELOPMENT.md`), and V2.1–V2.5 a sixth (**Market
+> `docs/BUSINESS_DEVELOPMENT.md`), and V2.1–V2.6 a sixth (**Market
 > Intelligence** — external prospect discovery, evidence-based
 > qualification, transparent prioritisation scoring, a narrow read-only
 > CRM duplicate check, and preparing a human-confirmed CRM lead
-> proposal, see `docs/MARKET_INTELLIGENCE.md`). Each is the same single
+> proposal, see `docs/MARKET_INTELLIGENCE.md`; **V2 is feature-frozen as
+> of V2.6** — `docs/V2_RELEASE_READINESS.md`). Each is the same single
 > `Agent` engine with a different `AgentDefinition` — no orchestrator,
 > no swarm, no agent-to-agent calls were added. Everything below about
 > the engine, routing, `AgentPromptRules`, the audit trail, and the

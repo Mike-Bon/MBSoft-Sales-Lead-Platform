@@ -1,7 +1,11 @@
-# Market Intelligence — Discover → Qualify → Score → De-dupe → Human-Confirmed Lead (V2.1–V2.5)
+# Market Intelligence — Discover → Qualify → Score → De-dupe → Human-Confirmed Lead (V2.1–V2.6)
 
 Authoritative reference for the Market Intelligence capability. If this
 document and the code disagree, the code is a bug against this document.
+**V2 is feature-frozen** as of V2.6 — see
+[**V2.6 — Security review & feature freeze**](#v26--security-review--feature-freeze)
+at the end of this document, and `docs/V2_RELEASE_READINESS.md` for the
+full threat model, UAT results, and deployment checklist.
 The V2.1 sections below are unchanged; V2.2 adds
 [**Prospect Qualification & Evidence**](#prospect-qualification--evidence-v22),
 V2.3 adds
@@ -1484,3 +1488,127 @@ confirm/owner/team param), `MarketIntelligenceLeadCreationInjectionTest`
 blocked eligibility cannot be flipped, `create_lead` / `confirm_*` tool
 calls write nothing, prompt immutable). No live network, no external
 research in the confirm path.
+
+---
+
+# V2.6 — Security review & feature freeze
+
+**What V2.6 is.** The final V2 phase: an adversarial security pass over
+the whole V2.1–V2.5 pipeline, a full regression run, Manager / Team Head
+/ Team Member end-to-end UAT, deployment-readiness documentation, and the
+`V2 FEATURE FREEZE` declaration. **V2.6 adds no product functionality.**
+
+**What V2.6 changed.** Two low-severity hardening fixes only:
+
+1. **The confirmation fingerprint now binds to the proposal id.**
+   `ProspectLeadProposal::fingerprintFor()` gained a trailing
+   `?int $proposalId` argument (`'proposal_id'` is the first key of the
+   canonical array); `currentFingerprint()` passes `$this->id`;
+   `ProspectLeadProposalService::prepare()` inserts the row first, then
+   computes and saves the fingerprint. This stops one user's Proposal A
+   fingerprint from satisfying the confirm check on their Proposal B when
+   the two proposals carry byte-identical proposed content. No privilege
+   change — same-user only — but the wrong proposal row could otherwise
+   be consumed.
+2. **`ProspectLeadCreationService::confirmAndCreate()` refuses a
+   non-Manager / non-Team-Head actor itself**, before any transaction —
+   defense in depth behind the two existing HTTP-layer policy checks
+   (`ConfirmProspectLeadRequest::authorize()` and the controller).
+
+Neither fix touches the public workflow, the schema, config, or routes.
+
+## Frozen shape (pinned by `V2FreezeInvariantsTest`)
+
+- The `MarketIntelligence` agent has **exactly six tools**:
+  `discover_prospects`, `qualify_prospects`, `score_prospects`,
+  `check_prospect_duplicates`, `prepare_prospect_for_crm`, scoped
+  `search_knowledge`. No CRM write / confirm / assign / send / draft /
+  SQL / Cost-to-Serve / performance / unrestricted-CRM-read tool, by name
+  or by capability.
+- `ScoringModel` and `DuplicateMatchPolicy` are valid out of the box and
+  fall back to frozen defaults on bad config.
+- Only Manager and Team Head can reach Market Intelligence.
+- Every MI config key has a safe default; no secret is committed
+  (`config('services.search.provider')` is `null`,
+  `services.search.brave.api_key` is `''`).
+- `prospect_lead_proposals` is the only new table; its migration
+  (`2026_08_31_090000_…`) is the last one and ordered after all V1 CRM
+  tables.
+
+## Security invariants proven in V2.6
+
+See `docs/V2_RELEASE_READINESS.md` §3 for the full table (I1–I12) and the
+test that pins each. Highlights:
+
+- **SSRF** — `V2SsrfAdversarialTest` drives real redirects (public →
+  `127.0.0.1` / `10.x` / `169.254.169.254`) through `WebEvidenceFetcher`;
+  every hop is re-checked by `OutboundUrlGuard` and the fetch aborts. The
+  guard rejects ~21 canonical dangerous targets directly and refuses the
+  app + configured DB hosts. **The guard was not loosened for any test.**
+- **Prompt injection** — `V2HostileContentMatrixTest` injects hostile
+  text into page title/body, business name, evidence summary, source
+  snippet, prospect identity, qualification text, proposed lead notes,
+  and the human-editable confirm fields. All inert: no outcome, score,
+  eligibility, or duplicate-status change; no write; extra payload keys
+  (`confirmed`, `eligibility`, `owner_id`, `team_id`, `user_id`,
+  `status`) ignored; hostile human-typed text is stored verbatim as data.
+- **Cross-team privacy** — `V2CrossTeamPrivacyAttackTest` puts an
+  exact-domain, exact-name, fuzzy, null-team, and secret-note record
+  under Team B; Team Head A's duplicate check returns `no_match` with
+  `candidates_examined = 0`, the audit counts and names nothing, and
+  crafted `team_id` / `owner_id` / `crm_record_id` / `candidate_matches`
+  in the payload cannot widen scope. A Team Head `no_match` is documented
+  (and surfaced in `next_action`) as "not in your scope", never an
+  org-wide guarantee.
+- **Confirmation integrity** — `V2ConfirmationSecurityTest`: Proposal A
+  fingerprint ✗ Proposal B, User B ✗ User A's proposal, changed
+  duplicate state invalidates a pending form, forged acknowledgement
+  text does nothing, exact-duplicate cannot borrow the possible-duplicate
+  override, a cancelled proposal cannot be revived, the write service
+  itself refuses a non-MI actor.
+
+## UAT results
+
+`V2WorkflowUatTest`, deterministic fake provider, no live web:
+
+- **Manager end-to-end** — discover → qualify → score → dedupe (a
+  pre-seeded CRM org → `exact_duplicate` → **blocked**) → a clean
+  prospect → `no_match` → prepare (0 CRM writes) → HTTP **Create Lead** →
+  exactly one Organization + one Lead, `source = "Market Intelligence"`,
+  V1 "Lead created" activity, Manager owner, 0 Communications, proposal
+  `confirmed`.
+- **Team Head end-to-end** — a restricted Team B duplicate stays
+  invisible; the new Lead + Organization are forced to the head's own
+  team.
+- **Team Member negative** — Market Intelligence is not offered in the
+  assistant; all three research tools throw `AuthorizationException`;
+  every proposal route returns 403.
+- **Unauthenticated** — proposal routes redirect to login.
+
+## LeadPolicy::create() — reviewed, not changed
+
+`LeadPolicy::create()` returns `true` for every authenticated user; this
+is intentional pre-existing V1 behaviour (a Team Member creates their own
+CRM leads through the normal UI). It is **not** a V2.5 hole: the V2.5
+confirm path additionally requires `ProspectLeadProposalPolicy::confirm`
+(Manager / Team Head **and** proposal owner), which a Team Member can
+never satisfy. Proven end-to-end by `V2WorkflowUatTest` and
+`V2ConfirmationSecurityTest`. No change made.
+
+## Test baseline at freeze
+
+```
+php artisan test          → 1001 passed, 3451 assertions, 0 failures
+./vendor/bin/pint --test  → PASS
+```
+
++35 tests / +266 assertions over the V2.5 baseline (966 / 3185), all
+V2.6 security / adversarial / UAT coverage; no prior-phase regression.
+
+## V2 FEATURE FREEZE
+
+V2.1–V2.6 are complete and frozen. No further V2 feature changes before
+deployment / UAT sign-off, except release-blocking defect fixes, security
+fixes, and deployment fixes. All enhancements move to V3 / the backlog
+(`docs/V2_BACKLOG.md`). A `v2.0.0` tag is recommended **after explicit
+approval** — not created as part of V2.6.

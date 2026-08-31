@@ -51,6 +51,15 @@ final class ProspectLeadCreationService
      */
     public function confirmAndCreate(User $actor, ProspectLeadProposal $proposal, array $validated): array
     {
+        // Defense in depth (V2.6): the HTTP layer already enforces
+        // ProspectLeadProposalPolicy (Manager/Team-Head + owner) twice —
+        // in ConfirmProspectLeadRequest::authorize() and the controller.
+        // The write service refuses a non-Market-Intelligence actor on
+        // its own so the invariant holds even for a direct call.
+        if (! $actor->isManager() && ! $actor->isTeamHead()) {
+            return $this->failure('forbidden', 'Creating a CRM lead from a prospect proposal is available to Managers and Team Heads only.');
+        }
+
         try {
             return DB::transaction(function () use ($actor, $proposal, $validated) {
                 /** @var ProspectLeadProposal $locked */

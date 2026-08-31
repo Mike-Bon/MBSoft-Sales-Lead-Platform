@@ -67,11 +67,6 @@ final class ProspectLeadProposalService
 
         $candidateOrgIds = $this->candidateOrgIds($duplicateCheck);
 
-        $fingerprint = ProspectLeadProposal::fingerprintFor(
-            $organization, $lead, $actor->id, $checkStatus, $duplicateStatus,
-            $eligibility->requiresDuplicateAcknowledgement(), $policyVersion,
-        );
-
         // One live proposal per prospect per user — a fresh prepare
         // supersedes any earlier pending one so a stale confirm form
         // stops working (spec §17).
@@ -87,7 +82,7 @@ final class ProspectLeadProposalService
         $proposal->status = ProspectProposalStatus::Pending;
         $proposal->eligibility = $eligibility;
         $proposal->policy_version = $policyVersion;
-        $proposal->fingerprint = $fingerprint;
+        $proposal->fingerprint = 'pending';
         $proposal->business_name = $identity->business !== '' ? $identity->business : ($identity->normalizedHost() ?? 'Unnamed prospect');
         $proposal->website = $identity->website;
         $proposal->domain = IdentityNormalizer::host($identity->domain) ?? IdentityNormalizer::host($identity->website);
@@ -98,6 +93,11 @@ final class ProspectLeadProposalService
         $proposal->duplicate_status = $duplicateStatus;
         $proposal->duplicate_ack_required = $eligibility->requiresDuplicateAcknowledgement();
         $proposal->expires_at = now()->addHours((int) config('services.market_intelligence.lead_creation.proposal_ttl_hours', 48));
+        $proposal->save();
+
+        // The fingerprint binds to this specific proposal's id, so it can
+        // only be computed after the insert.
+        $proposal->fingerprint = $proposal->currentFingerprint();
         $proposal->save();
 
         AuditLogger::record('market_intelligence.crm_proposal_prepared', $actor, [

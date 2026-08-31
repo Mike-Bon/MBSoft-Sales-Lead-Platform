@@ -60,10 +60,11 @@ class ProspectLeadProposal extends Model
 
     /**
      * Deterministic content fingerprint (spec §17). Binds a confirmation
-     * to the exact canonical CRM fields + actor + duplicate state +
-     * acknowledgement requirement + policy version the human reviewed.
-     * Any material change produces a different hash, so a stale
-     * confirmation stops matching.
+     * to one specific proposal — its id + actor + the exact canonical CRM
+     * fields + duplicate state + acknowledgement requirement + policy
+     * version the human reviewed. Any material change produces a
+     * different hash (so a stale confirmation stops matching), and
+     * Proposal A's fingerprint can never confirm Proposal B.
      *
      * @param  array<string, mixed>  $organization
      * @param  array<string, mixed>  $lead
@@ -76,8 +77,10 @@ class ProspectLeadProposal extends Model
         ?string $duplicateStatus,
         bool $ackRequired,
         string $policyVersion,
+        ?int $proposalId = null,
     ): string {
         $canonical = [
+            'proposal_id' => $proposalId,
             'organization' => self::canonicalise($organization),
             'lead' => self::canonicalise($lead),
             'user_id' => $userId,
@@ -100,6 +103,7 @@ class ProspectLeadProposal extends Model
             $this->duplicate_status,
             $this->duplicate_ack_required,
             $this->policy_version,
+            $this->id,
         );
     }
 
