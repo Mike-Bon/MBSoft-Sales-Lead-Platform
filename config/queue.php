@@ -43,6 +43,22 @@ return [
             'after_commit' => false,
         ],
 
+        // V2.0.3: user-initiated Market Intelligence research
+        // (ProspectResearchJob). Same `jobs` table, a distinct queue
+        // name, and a retry_after that FAR exceeds the job's own timeout
+        // (2400s) so a second cron worker can never reserve a research
+        // job that is still running. Drained by its own dedicated cron —
+        // see deploy/README.md. Never put a long MI job on the normal
+        // `database` connection (retry_after 90).
+        'market-intelligence' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'market-intelligence',
+            'retry_after' => (int) env('MI_QUEUE_RETRY_AFTER', 3000),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

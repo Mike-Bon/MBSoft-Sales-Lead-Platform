@@ -26,6 +26,13 @@ class SendAssistantMessageRequest extends FormRequest
     {
         return [
             'message' => ['required', 'string', 'max:'.(int) config('services.ai.max_message_length', 2000)],
+            // V2.0.3: a per-page-render UUID (hidden field). Only the
+            // Market Intelligence path uses it — as the idempotency
+            // token that makes a browser re-POST (refresh/back/double-
+            // click) hit the same ProspectResearchRun instead of
+            // dispatching a second research job. Absent/!uuid is
+            // tolerated (falls back to a fresh run).
+            'submission_id' => ['nullable', 'uuid'],
             'agent' => [
                 'nullable',
                 Rule::enum(AgentIdentifier::class),

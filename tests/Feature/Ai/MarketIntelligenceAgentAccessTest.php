@@ -5,10 +5,14 @@ namespace Tests\Feature\Ai;
 use App\Contracts\Ai\LlmProvider;
 use App\Contracts\MarketIntelligence\SearchProvider;
 use App\Enums\AgentIdentifier;
+use App\Jobs\MarketIntelligence\ProspectResearchJob;
 use App\Models\AgentInteraction;
+use App\Models\ProspectResearchRun;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Tests\Support\FakeLlmProvider;
 use Tests\Support\FakeSearchProvider;
 use Tests\TestCase;
@@ -59,27 +63,41 @@ class MarketIntelligenceAgentAccessTest extends TestCase
         $this->assertDatabaseCount('agent_interactions', 0);
     }
 
-    public function test_a_manager_can_explicitly_select_market_intelligence(): void
+    public function test_a_manager_explicitly_selecting_market_intelligence_queues_a_research_job(): void
     {
-        $this->app->instance(LlmProvider::class, new FakeLlmProvider([FakeLlmProvider::text('Here are some candidates.')]));
+        // V2.0.3: Market Intelligence runs asynchronously — the web
+        // request dispatches a job and returns immediately; it never
+        // calls the Agent (so no synchronous AgentInteraction here).
+        Queue::fake();
+        $manager = User::factory()->manager()->create();
 
-        $this->actingAs(User::factory()->manager()->create())->post('/assistant/messages', [
+        $this->actingAs($manager)->post('/assistant/messages', [
             'message' => 'Find businesses in Cebu selling cosmetics online.',
             'agent' => 'market_intelligence',
+            'submission_id' => (string) Str::uuid(),
         ])->assertRedirect(route('assistant.show'));
 
-        $this->assertSame('market_intelligence', AgentInteraction::firstOrFail()->agent);
+        Queue::assertPushed(ProspectResearchJob::class, 1);
+        $this->assertDatabaseCount('agent_interactions', 0);
+
+        $run = ProspectResearchRun::firstOrFail();
+        $this->assertSame($manager->id, $run->user_id);
+        $this->assertSame('queued', $run->status->value);
     }
 
-    public function test_auto_routing_lands_a_manager_on_market_intelligence_for_a_discovery_question(): void
+    public function test_auto_routing_lands_a_manager_on_market_intelligence_and_queues_a_research_job(): void
     {
-        $this->app->instance(LlmProvider::class, new FakeLlmProvider([FakeLlmProvider::text('ok')]));
+        Queue::fake();
+        $manager = User::factory()->manager()->create();
 
-        $this->actingAs(User::factory()->manager()->create())->post('/assistant/messages', [
+        $this->actingAs($manager)->post('/assistant/messages', [
             'message' => 'Find businesses in Cebu City that sell cosmetics online.',
-        ]);
+            'submission_id' => (string) Str::uuid(),
+        ])->assertRedirect(route('assistant.show'));
 
-        $this->assertSame('market_intelligence', AgentInteraction::firstOrFail()->agent);
+        Queue::assertPushed(ProspectResearchJob::class, 1);
+        $this->assertDatabaseCount('agent_interactions', 0);
+        $this->assertSame($manager->id, ProspectResearchRun::firstOrFail()->user_id);
     }
 
     public function test_a_team_members_discovery_question_falls_back_to_sales_not_a_403(): void

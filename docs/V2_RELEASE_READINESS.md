@@ -253,11 +253,19 @@ middleware (`@csrf` in the review form). `route:cache` works.
 ## 12. Hostinger / deployment readiness
 
 V2 requires **none** of: local persistent file storage for MI state
-(proposals are DB-backed), writable app source dirs, a long-running
-worker (search/fetch is request-bound and bounded; no queue jobs added),
-browser automation, or a Node process in production (`public/build/` is
-committed per V1). The document root stays `/public`. Outbound HTTPS to
+(proposals are DB-backed), writable app source dirs, browser automation,
+or a Node process in production (`public/build/` is committed per V1).
+The document root stays `/public`. Outbound HTTPS to
 the search provider is the only new external network requirement, and
+
+> **V2.0.3 update:** user-initiated Market Intelligence now runs on a
+> dedicated `market-intelligence` **database** queue (no new
+> infrastructure — same `jobs` table). Production needs a **second**
+> 1-minute cron: `php artisan queue:work market-intelligence
+> --stop-when-empty --tries=1 --timeout=2400 --sleep=5`. Its connection
+> `retry_after` (`MI_QUEUE_RETRY_AFTER`, default 3000s) exceeds the job
+> timeout so a still-running research job is never double-reserved. See
+> `deploy/README.md` and `docs/AI_ASSISTANT.md`.
 only when `SEARCH_PROVIDER` is set. The `proc_open`-disabled
 Hostinger constraint from V1 is unaffected (no new artisan-in-composer
 steps).
@@ -359,8 +367,9 @@ in the V2.6 spec §43 is met.
 
 **Laravel / web**
 - [ ] `storage/`, `bootstrap/cache/` writable
-- [ ] session/cache driver = `database` (V1 default), queue = `database` (no new jobs)
-- [ ] scheduler unchanged (no new scheduled task in V2)
+- [ ] session/cache driver = `database` (V1 default), queue = `database`
+- [ ] **V2.0.3:** add the second cron for the `market-intelligence` queue worker (see `deploy/README.md`); optionally set `MI_QUEUE_RETRY_AFTER` (default 3000)
+- [ ] scheduler unchanged (no new scheduled task)
 - [ ] subdomain document root → Laravel `/public` (V1 `.htaccess` rewrite)
 - [ ] HTTPS enforced; outbound HTTPS to `api.search.brave.com` allowed
 

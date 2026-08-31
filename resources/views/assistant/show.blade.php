@@ -2,6 +2,7 @@
     $statusColor = fn ($status) => match ($status) {
         'failed' => 'red',
         'limit_reached' => 'amber',
+        'queued', 'running' => 'blue',
         default => null,
     };
 @endphp
@@ -42,7 +43,13 @@
                             <flux:badge size="sm" class="mb-2" :color="$statusColor($turn['status'])">{{ ucfirst(str_replace('_', ' ', $turn['status'])) }}</flux:badge>
                         @endif
 
-                        <p class="whitespace-pre-line">{{ $turn['content'] ?? '(no response)' }}</p>
+                        @if (($turn['status'] ?? null) === 'queued')
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Market Intelligence research is queued…</p>
+                        @elseif (($turn['status'] ?? null) === 'running')
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Researching prospects — this can take a few minutes. This page updates automatically; you can leave and come back.</p>
+                        @else
+                            <p class="whitespace-pre-line">{{ $turn['content'] ?? '(no response)' }}</p>
+                        @endif
                     </div>
                 @endif
             @empty
@@ -118,8 +125,37 @@
             </div>
         @endif
 
+        @if (! empty($pendingResearchRunIds))
+            <div
+                x-data="{
+                    ids: @js($pendingResearchRunIds),
+                    timer: null,
+                    check() {
+                        this.ids.forEach(async (id) => {
+                            try {
+                                const res = await fetch(`{{ url('assistant/research') }}/${id}/status`, {
+                                    headers: { 'Accept': 'application/json' },
+                                    credentials: 'same-origin',
+                                });
+                                if (!res.ok) return;
+                                const data = await res.json();
+                                if (data.done) {
+                                    clearInterval(this.timer);
+                                    window.location.reload();
+                                }
+                            } catch (e) { /* transient — try again next tick */ }
+                        });
+                    },
+                }"
+                x-init="timer = setInterval(() => check(), 4000)"
+                x-on:livewire:navigating.window="clearInterval(timer)"
+                wire:ignore
+            ></div>
+        @endif
+
         <form method="POST" action="{{ route('assistant.send-message') }}" class="space-y-3">
             @csrf
+            <input type="hidden" name="submission_id" value="{{ $submissionId }}">
             <flux:select name="agent" label="Ask" placeholder="Auto — let the assistant pick">
                 @foreach ($agents as $agentOption)
                     <flux:select.option value="{{ $agentOption->value }}" :selected="old('agent') === $agentOption->value">{{ $agentOption->label() }}</flux:select.option>

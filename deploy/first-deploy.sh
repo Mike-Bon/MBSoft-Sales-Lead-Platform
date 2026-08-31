@@ -267,13 +267,18 @@ cat <<DONE
 1) Subdomains -> app.mbsoft.online -> Document Root:
       ${APP_DIR}/public
 
-2) Advanced -> Cron Jobs -> add BOTH:
+2) Advanced -> Cron Jobs -> add ALL THREE:
 
    # daily agentic workflow
    ${SCHED_CRON}
 
-   # queue worker (every minute; drains the queue then exits)
+   # normal queue worker (every minute; drains fast jobs then exits)
    * * * * *  cd ${APP_DIR} && ${PHP} artisan queue:work --stop-when-empty --max-time=55 --tries=3 >> storage/logs/worker.log 2>&1
+
+   # V2.0.3: dedicated Market Intelligence research worker (long jobs,
+   # ~150-270s; own connection with retry_after 3000 > job timeout 2400
+   # so a job in flight is never double-reserved). See deploy/README.md.
+   * * * * *  cd ${APP_DIR} && ${PHP} artisan queue:work market-intelligence --stop-when-empty --tries=1 --timeout=2400 --sleep=5 >> storage/logs/mi-worker.log 2>&1
 
 3) Security -> SSL -> ensure SSL is active for app.mbsoft.online and
    "Force HTTPS" is on.

@@ -40,8 +40,9 @@ uses Brave (`SEARCH_PROVIDER=brave`, `BRAVE_SEARCH_COUNTRY=PH`).
 ### 3. hPanel (the script prints these exact lines at the end)
 - **Subdomains → app.mbsoft.online → Document Root** → append `/public`
   (e.g. `~/domains/mbsoft.online/public_html/app/public`).
-- **Advanced → Cron Jobs** → add the two cron lines the script printed
-  (scheduler + queue worker, every minute).
+- **Advanced → Cron Jobs** → add the **three** cron lines the script
+  printed (scheduler; the normal 1-minute queue worker; and — V2.0.3 —
+  a dedicated Market Intelligence worker, see "Queue" under Notes).
 
 ### 4. Check
 Open `https://app.mbsoft.online/` → it redirects to `/login` with your
@@ -72,10 +73,33 @@ bash deploy/redeploy.sh v1.0.2
   and the cron for the daily workflow calls `artisan workflows:run-daily`
   directly instead of `artisan schedule:run` (which needs `proc_open`).
   The application's own runtime code never uses `proc_open`.
-- **Queue** — no persistent worker on shared hosting; the 1‑minute cron
+- **Queue** — no persistent worker on shared hosting; a 1‑minute cron
   drains the queue each run (≤ 60 s latency). `queue:work` does not need
   `proc_open`. Move to a VPS + Supervisor if volume grows
-  (`docs/DEPLOYMENT.md` §4).
+  (`docs/DEPLOYMENT.md` §4). Two workers, two crons:
+
+  ```
+  # normal jobs — short, fast (comms, knowledge, scheduled workflows)
+  * * * * *  cd <app> && php artisan queue:work --stop-when-empty --max-time=55 --tries=3 >> storage/logs/worker.log 2>&1
+
+  # V2.0.3: user-initiated Market Intelligence research — long
+  # (~150-270s realistically; hard-capped at the 2400s job timeout).
+  # Its own connection has retry_after=3000 (> the job timeout), so a
+  # second worker started by the next cron minute can never reserve a
+  # job that is still running; it just sees the reservation and exits.
+  # No --max-time here: --max-time is checked only BETWEEN jobs and
+  # would not interrupt a running research job anyway, and we do not
+  # want a short cap racing a legitimate long run. --stop-when-empty
+  # makes the worker exit as soon as the MI queue is drained.
+  * * * * *  cd <app> && php artisan queue:work market-intelligence --stop-when-empty --tries=1 --timeout=2400 --sleep=5 >> storage/logs/mi-worker.log 2>&1
+  ```
+
+  `--timeout` needs the `pcntl` extension to actually kill an overrun
+  job; if Hostinger lacks it the enforced per-request cURL timeouts
+  (Gemini 90 s, Brave 15 s ×2, page-fetch 8 s ×3 hops) still bound the
+  total, and `retry_after` + the job's `WithoutOverlapping` +
+  `tries=1` + the `handle()` status guard still make a duplicate
+  execution impossible.
 - **Supabase** — connect via the **Session pooler**
   (`aws-0-<region>.pooler.supabase.com:5432`), not the direct
   `db.<ref>.supabase.co` host (IPv6‑only). The script defaults to the

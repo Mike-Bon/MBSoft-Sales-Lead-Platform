@@ -253,6 +253,49 @@ than testing the model's own judgment.
   call itself.
 - Rate limiting: `throttle:20,1` on the message-sending route.
 
+## Asynchronous Market Intelligence (V2.0.3)
+
+Every agent runs **synchronously inside the HTTP request** — except
+**Market Intelligence**, whose real execution (Gemini + Brave searches +
+public-page fetches) is ~150–270s and cannot fit inside a shared-hosting
+request window.
+
+- When `AssistantController::sendMessage` resolves the agent to
+  `MarketIntelligence` it does **not** call `AssistantService::respond()`.
+  It idempotently creates a `ProspectResearchRun`
+  (`prospect_research_runs`), dispatches `ProspectResearchJob` onto the
+  dedicated **`market-intelligence`** database queue, adds a "queued"
+  turn to the session conversation, and redirects immediately.
+- `ProspectResearchJob` (`tries=1`, `timeout=2400`, `WithoutOverlapping`)
+  calls the **unchanged** `AssistantService::respond(MarketIntelligence,
+  $run->user, $run->message)` as the original requesting user, then
+  writes `status`, `result` (the same synthesis text the sync path would
+  have returned), tool **names**, and `agent_interaction_id` back to the
+  run. A `Failed` `AgentResponse` → `status=failed` with the existing
+  safe message; an uncaught worker failure → `failed()` marks it failed
+  generically. **No auto-retry** of a partly-run pipeline (the MI
+  services charge their hourly rate limiter per call).
+- The `market-intelligence` connection's `retry_after` (`MI_QUEUE_RETRY_AFTER`,
+  3000s) far exceeds the job timeout, so a second cron worker can never
+  reserve a still-running research job. **Two crons** (`deploy/README.md`):
+  the normal 1-minute `queue:work` and a dedicated
+  `queue:work market-intelligence --stop-when-empty --tries=1 --timeout=2400`.
+- The browser polls `GET /assistant/research/{run}/status` (owner-only,
+  `ProspectResearchRunPolicy`) every 4s via a tiny Alpine snippet; on a
+  terminal status it reloads once and `AssistantController::show()`
+  settles the run's `result` (or safe failure) into the conversation
+  turn. The user can leave and return — the run is not tied to the
+  session.
+- **Idempotency:** the run's unique key is `sha256(user_id | submission_id)`,
+  where `submission_id` is a UUID minted into a hidden form field on each
+  page render. A browser re-POST (refresh / back / double-click) resends
+  the same token → same run → no second job / no second Brave/Gemini
+  spend. A fresh render → new token → the user can deliberately re-ask.
+- Everything downstream is unchanged: the same single `Agent`, the same
+  MI tools, scoring, qualification, CRM duplicate detection, and the
+  `prepare_prospect_for_crm` → `prospect_lead_proposals` → human-confirm
+  path. Async MI still cannot autonomously create a CRM lead.
+
 ## Failure handling (STEP 28)
 
 `AssistantService::respond()` catches `AiProviderException` (auth
