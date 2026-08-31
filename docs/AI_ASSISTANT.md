@@ -30,7 +30,8 @@ User → AssistantController → AssistantService → Agent (generic engine)
                                     ┌───────────────┼────────────────┐
                                     ▼                                ▼
                               LlmProvider                      ToolRegistry
-                          (AnthropicProvider)              (13 AgentTool instances)
+                    (GeminiProvider default /            (13 AgentTool instances)
+                     AnthropicProvider fallback)
                                                                      │
                                                      each tool calls an existing
                                                      application service/policy
@@ -69,22 +70,49 @@ agent is explicitly out of scope for Phase 7.
 
 ## LLM provider
 
-- **Provider:** Anthropic (Claude), chosen because its Messages API has
-  native tool-use/function-calling support that matches this
-  architecture directly, and because no official PHP SDK exists for it
-  — so, exactly like Phase 6's WhatsApp Cloud API integration, plain
-  HTTPS via Laravel's `Http` facade against the documented REST API
-  (`https://api.anthropic.com/v1/messages`) is the correct approach.
+- **Provider:** Google Gemini (`generateContent` REST API,
+  `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`),
+  chosen as the V2.0.0 default. Anthropic (Claude) is retained as a
+  supported fallback. Both have native tool-use/function-calling that
+  matches this architecture directly and neither ships an official PHP
+  SDK — so, exactly like Phase 6's WhatsApp Cloud API integration,
+  plain HTTPS via Laravel's `Http` facade against the documented REST
+  API is the correct approach.
 - **Provider abstraction:** `App\Contracts\Ai\LlmProvider`, implemented
-  by `App\Services\Ai\Providers\AnthropicProvider`, bound in
-  `AppServiceProvider`. `Agent`/`AssistantService`/every `AgentTool`
-  depend only on this interface — swapping provider or model touches
-  only `config/services.php`, `.env`, and (for a genuinely different
-  provider) one new class implementing `LlmProvider`.
-- **Model/config:** `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL` (default
-  `claude-sonnet-4-5-20250929`), `LLM_MAX_TOKENS`, `LLM_TIMEOUT_SECONDS`
-  — all environment-driven (`config/services.php`'s `anthropic` block).
-  Never hard-coded, never logged, never exposed to the browser.
+  by `App\Services\Ai\Providers\GeminiProvider` (default) and
+  `App\Services\Ai\Providers\AnthropicProvider` (fallback). The concrete
+  class is selected in `AppServiceProvider` from `LLM_PROVIDER`; an
+  unrecognised value binds `MisconfiguredLlmProvider`, which fails the
+  same safe way a missing key does (assistant unavailable, CRM
+  unaffected, real reason logged) rather than silently substituting a
+  working provider. `Agent`/`AssistantService`/every `AgentTool` depend
+  only on the interface — swapping provider or model touches only
+  `config/services.php`, `.env`, and (for a genuinely new provider) one
+  new class. `Agent`, the `LlmProvider` interface, `AiCompletionResult`,
+  `ToolCall`, `ToolDefinition` and every tool were unchanged by the
+  Gemini swap.
+- **Model/config:** `LLM_PROVIDER` (default `gemini`), `LLM_API_KEY`,
+  `LLM_MODEL` (default `gemini-2.5-flash`), `LLM_MAX_TOKENS`,
+  `LLM_TIMEOUT_SECONDS` — all environment-driven
+  (`config/services.php`'s `llm` block). Never hard-coded, never
+  logged, never exposed to the browser. The model must support function
+  calling; keep it entirely env-driven so a later model change needs no
+  code edit.
+- **Gemini billing:** a Gemini **API** key (Google AI Studio) has its
+  own quota/billing on a Google AI Studio / Google Cloud project — it
+  is **separate** from any consumer "Gemini" app subscription.
+- **Tool-call correlation:** Gemini's `functionCall`/`functionResponse`
+  parts carry only an *optional* `id`. `GeminiProvider` round-trips a
+  real id when Gemini supplies one and otherwise synthesises a
+  deterministic `"{name}#{index}"` id, so `Agent` associates every tool
+  result with its call. On the return trip it always sends the function
+  `name` (Gemini's primary key) in call order — which is why parallel
+  and repeated same-function calls stay correctly matched.
+- **Search is not the LLM:** Gemini is only the reasoning/tool-selection
+  model. It is given exactly the ToolRegistry's function declarations
+  and nothing else — no Google Search grounding, URL-context tool, code
+  execution, or built-in retrieval. External web discovery stays with
+  Brave (`SEARCH_PROVIDER=brave`, see `docs/MARKET_INTELLIGENCE.md`).
 
 ## Tool categories and the 13 tools
 
@@ -173,8 +201,9 @@ message bodies) is treated as untrusted data:
 
 1. **Structural separation.** `LlmProvider::complete()` takes the system
    prompt as a wholly separate parameter from the conversation.
-   `AnthropicProvider` sends it via Anthropic's own `system` field, never
-   concatenated into the `messages` array. CRM content only ever enters
+   `GeminiProvider` sends it via Gemini's own `systemInstruction` field
+   and `AnthropicProvider` via Anthropic's `system` field — never
+   concatenated into the conversation. CRM content only ever enters
    a conversation as `tool_result` content — it can never become part of
    the system prompt, because nothing in this codebase ever does that.
 2. **System instructions** (`CrmAssistantPrompt::text()`) explicitly
@@ -255,15 +284,16 @@ in this codebase.
    and via the explicit "New conversation" action, but is not itself an
    audit record — `AgentInteraction` is the durable audit trail
    regardless of what happens to the session.
-3. **No real Anthropic credentials were available while building this
-   phase.** Every automated test uses `FakeLlmProvider` or
-   `Http::fake()` against `AnthropicProvider`'s real wire-format code —
-   never a real API call. Live behavior against the real Anthropic API
+3. **No real LLM credentials were available while building this.** Every
+   automated test uses `FakeLlmProvider` or `Http::fake()` against
+   `GeminiProvider`'s / `AnthropicProvider`'s real wire-format code —
+   never a real API call. Live behaviour against the real Gemini API
    (does the real model actually resist a real injection attempt, does
-   it choose sensible tools for an ambiguous request, does real latency
-   fit comfortably under the timeout) has **not** been verified and must
-   not be assumed to work until someone with a real API key exercises it
-   manually.
+   it choose sensible tools for an ambiguous request, does it emit
+   `functionCall` `id`s or rely on name+order, does real latency fit
+   comfortably under the timeout) has **not** been verified and must not
+   be assumed to work until someone with a real `LLM_API_KEY` exercises
+   it manually.
 4. **`get_pipeline_summary`/`get_followups`'s "team" scope trusts the
    actor's own `team_id` as the default** when no `team_id` argument is
    given — this is the same default every dashboard already uses, not a

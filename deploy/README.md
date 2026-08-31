@@ -26,9 +26,16 @@ git checkout v1.0.1                 # the release you are deploying
 bash deploy/first-deploy.sh
 ```
 The script installs dependencies, writes `.env` (it will ask for the
-Supabase **database password** and, optionally, an Anthropic API key),
-generates `APP_KEY`, runs the migration, caches views/events, sets
-permissions, and can create the first Manager account.
+Supabase **database password** and, optionally, a **Gemini API key**
+and a **Brave Search API key**), generates `APP_KEY`, runs the
+migration, caches views/events, sets permissions, and can create the
+first Manager account.
+
+The AI assistant defaults to `LLM_PROVIDER=gemini` /
+`LLM_MODEL=gemini-2.5-flash`; set `LLM_PROVIDER=anthropic` +
+`LLM_MODEL=claude-...` in `.env` to use the Anthropic fallback instead.
+Gemini is only the reasoning model — external prospect discovery still
+uses Brave (`SEARCH_PROVIDER=brave`, `BRAVE_SEARCH_COUNTRY=PH`).
 
 ### 3. hPanel (the script prints these exact lines at the end)
 - **Subdomains → app.mbsoft.online → Document Root** → append `/public`

@@ -55,16 +55,22 @@ return [
         'api_version' => env('WHATSAPP_API_VERSION', 'v20.0'),
     ],
 
-    // ── Phase 7: AI provider (Anthropic Claude) ─────────────────────
-    // LLM_PROVIDER/LLM_API_KEY/LLM_MODEL/LLM_MAX_TOKENS were reserved as
-    // generic names since Phase 1; the concrete first implementation is
-    // Anthropic (AppServiceProvider binds App\Contracts\Ai\LlmProvider
-    // to App\Services\Ai\Providers\AnthropicProvider). Never hard-coded
-    // elsewhere — swapping provider/model only ever touches this file
-    // and the .env value. See docs/AI_ASSISTANT.md.
-    'anthropic' => [
+    // ── Phase 7 / V2.0.0: LLM provider (provider-neutral) ───────────
+    // LLM_PROVIDER/LLM_API_KEY/LLM_MODEL/LLM_MAX_TOKENS/LLM_TIMEOUT_SECONDS
+    // have been generic since Phase 1. AppServiceProvider binds
+    // App\Contracts\Ai\LlmProvider to the class named by 'provider':
+    //   gemini    -> App\Services\Ai\Providers\GeminiProvider     (default)
+    //   anthropic -> App\Services\Ai\Providers\AnthropicProvider  (fallback)
+    // Never hard-coded elsewhere — swapping provider or model only ever
+    // touches the .env value. Gemini is ONLY the LLM; external web
+    // discovery stays with Brave (see 'search' below). Gemini API
+    // billing/quota is a Google AI Studio / Google Cloud project
+    // concern, separate from any consumer Gemini app subscription.
+    // See docs/AI_ASSISTANT.md.
+    'llm' => [
+        'provider' => env('LLM_PROVIDER', 'gemini'),
         'api_key' => env('LLM_API_KEY'),
-        'model' => env('LLM_MODEL', 'claude-sonnet-4-5-20250929'),
+        'model' => env('LLM_MODEL', 'gemini-2.5-flash'),
         'max_tokens' => env('LLM_MAX_TOKENS', 1024),
         'timeout' => env('LLM_TIMEOUT_SECONDS', 30),
     ],

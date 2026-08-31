@@ -217,9 +217,13 @@ succeed on the current codebase (verified). V2 adds no closure routes.
 
 | Env var | Purpose | Default (safe) | Required for… |
 |---|---|---|---|
-| `SEARCH_PROVIDER` | web-search adapter | *(unset → NullSearchProvider, discovery reports "not configured")* | V2.1–V2.3 live discovery |
+| `LLM_PROVIDER` | AI assistant model provider | `gemini` (`anthropic` = supported fallback; anything else = assistant unavailable, CRM unaffected) | the assistant / agents / workflows |
+| `LLM_API_KEY` | key for the selected provider (Gemini: Google AI Studio — quota separate from any consumer Gemini subscription) | *(unset → assistant dormant, CRM unaffected)* | the assistant |
+| `LLM_MODEL` | model id (must support function calling) | `gemini-2.5-flash` | — |
+| `LLM_MAX_TOKENS` / `LLM_TIMEOUT_SECONDS` | output cap / HTTP timeout | `1024` / `30` | — |
+| `SEARCH_PROVIDER` | web-search adapter (**not** the LLM — Gemini never searches the web) | *(unset → NullSearchProvider, discovery reports "not configured")* | V2.1–V2.3 live discovery |
 | `BRAVE_SEARCH_API_KEY` | Brave key | `''` (never a baked-in key) | `SEARCH_PROVIDER=brave` |
-| `BRAVE_SEARCH_COUNTRY` | result bias | *(unset)* | optional |
+| `BRAVE_SEARCH_COUNTRY` | result bias | `PH` (`.env.example`) | optional |
 | `SEARCH_HTTP_TIMEOUT` | seconds | `15` | — |
 | `MARKET_INTELLIGENCE_MAX_*` (results / searches / fetches / fetch_timeout / per_hour) | V2.1 discovery bounds | 20 / 3 / 8 / 12 / 8 / 12 | — |
 | `MARKET_INTELLIGENCE_MAX_QUALIFY_*` | V2.2 bounds | 8 / 6 / 8 / 12 | — |
@@ -344,7 +348,8 @@ in the V2.6 spec §43 is met.
 - [ ] `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://app.mbsoft.online`
 - [ ] `TRUSTED_PROXIES` set, `SESSION_SECURE_COOKIE=true`
 - [ ] DB / Supabase vars (Session Pooler) set
-- [ ] `SEARCH_PROVIDER=brave` + `BRAVE_SEARCH_API_KEY=…` **only if** MI discovery is to be enabled (otherwise leave unset → MI reports "not configured", safe)
+- [ ] `LLM_PROVIDER=gemini`, `LLM_API_KEY=…` (Google AI Studio), `LLM_MODEL=gemini-2.5-flash` — or `LLM_PROVIDER=anthropic` + a `claude-…` model for the fallback (leave `LLM_API_KEY` blank → assistant dormant, CRM unaffected)
+- [ ] `SEARCH_PROVIDER=brave` + `BRAVE_SEARCH_API_KEY=…` + `BRAVE_SEARCH_COUNTRY=PH` **only if** MI discovery is to be enabled (otherwise leave `SEARCH_PROVIDER` unset → MI reports "not configured", safe). This is a **separate** provider from `LLM_PROVIDER`.
 - [ ] any overridden `MARKET_INTELLIGENCE_*` / `MI_*` limits/versions
 
 **Database**

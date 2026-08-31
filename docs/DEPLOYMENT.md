@@ -251,4 +251,4 @@ without the user's separate, explicit sign-off:
   development).
 - Running the first production `migrate --force`.
 - Enabling the scheduler/queue workers on a live server.
-- Connecting real Gmail/WhatsApp/Anthropic production credentials.
+- Connecting real Gmail/WhatsApp/Gemini (or Anthropic) production credentials.

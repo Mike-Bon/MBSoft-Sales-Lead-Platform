@@ -41,7 +41,10 @@ class AssistantServiceTest extends TestCase
         $this->assertSame('sales', $interaction->agent);
         $this->assertSame('How is my pipeline?', $interaction->request);
         $this->assertSame('Your pipeline is healthy.', $interaction->response);
-        $this->assertSame('anthropic', $interaction->provider);
+        // The audit row records the provider/model actually configured
+        // (V2.0.0: driven by LLM_PROVIDER / LLM_MODEL, not hard-coded).
+        $this->assertSame(config('services.llm.provider'), $interaction->provider);
+        $this->assertSame(config('services.llm.model'), $interaction->model);
         $this->assertNotNull($interaction->started_at);
         $this->assertNotNull($interaction->completed_at);
     }

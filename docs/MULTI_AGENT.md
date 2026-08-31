@@ -76,8 +76,8 @@ and is never upgraded to this path.
 
 `App\Services\Ai\Agent` — the generic tool-calling engine — is **the
 exact same class from Phase 7**, unedited. `App\Contracts\Ai\LlmProvider`
-and `AnthropicProvider` are unedited. Every one of the 13 Phase 7/8
-tools is unedited. What Phase 9 adds:
+is unedited. Every one of the 13 Phase 7/8 tools is unedited. What Phase
+9 adds:
 
 - **`AgentDefinition`** (`app/Support/Ai/AgentDefinition.php`) — the
   common agent contract (STEP 5): identifier, name, purpose, system
@@ -242,11 +242,15 @@ from Phase 7).
 
 ## Provider independence (STEP 29)
 
-All three agents, the router, and the orchestrator depend only on
-`App\Contracts\Ai\LlmProvider` — none of them reference
-`AnthropicProvider` or any Anthropic-specific type. Swapping providers
-still means writing one new class and rebinding the interface in
-`AppServiceProvider`; no agent code changes.
+All agents, the router, and the orchestrator depend only on
+`App\Contracts\Ai\LlmProvider` — none of them reference a concrete
+provider or any provider-specific type. This was proven in V2.0.0 when
+the default provider was switched from Anthropic to Google Gemini
+(`GeminiProvider`): one new class plus the `LLM_PROVIDER`-driven
+selection in `AppServiceProvider`, with `Agent`, the interface,
+`AiCompletionResult`, `ToolCall`, `ToolDefinition` and every agent/tool
+unchanged. Anthropic (`AnthropicProvider`) remains a supported fallback
+(`LLM_PROVIDER=anthropic`).
 
 ## Known limitations
 
@@ -261,12 +265,12 @@ still means writing one new class and rebinding the interface in
    catch every possible phrasing of a genuinely cross-domain request —
    a user can always get both analyses by asking two separate questions
    instead, or by adding a phrase like "management review" explicitly.
-3. **No real Anthropic credentials were available while building this
-   phase** (same situation as Phase 7/8) — every automated test uses
-   `FakeLlmProvider`/`Http::fake()`. Live routing/agent-selection
-   behavior against the real model, and whether real model responses
-   read naturally when combined by the orchestrator, have not been
-   verified.
+3. **No real LLM credentials were available while building this**
+   (same situation as Phase 7/8, and unchanged by the V2.0.0 Gemini
+   swap) — every automated test uses `FakeLlmProvider`/`Http::fake()`.
+   Live routing/agent-selection behaviour against the real model, and
+   whether real model responses read naturally when combined by the
+   orchestrator, have not been verified.
 4. **`search_contacts`/`get_contact`** (built in Phase 7) remain
    unassigned to any of the three agents, per the specification's own
    tool lists — they still exist and are still fully tested, simply

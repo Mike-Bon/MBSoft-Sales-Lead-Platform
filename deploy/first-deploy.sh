@@ -93,7 +93,8 @@ else
     read -r -s -p "Supabase database password: " DB_PASS_IN; echo
     [ -n "$DB_PASS_IN" ] || { echo "ERROR: database password is required."; exit 1; }
 
-    read -r -p "Anthropic API key (optional, Enter to skip — AI stays dormant): " LLM_KEY_IN
+    read -r -p "Gemini API key (Google AI Studio; optional, Enter to skip — AI stays dormant): " LLM_KEY_IN
+    read -r -p "Brave Search API key (optional, Enter to skip — prospect discovery stays off): " BRAVE_KEY_IN
 
     echo "==> Writing .env ..."
     cat > .env <<ENV
@@ -144,14 +145,19 @@ MAIL_FROM_NAME="\${APP_NAME}"
 
 VITE_APP_NAME="\${APP_NAME}"
 
-LLM_PROVIDER=anthropic
+LLM_PROVIDER=gemini
 LLM_API_KEY=${LLM_KEY_IN}
-LLM_MODEL=claude-sonnet-4-5-20250929
+LLM_MODEL=gemini-2.5-flash
 LLM_MAX_TOKENS=1024
 LLM_TIMEOUT_SECONDS=30
 AI_MAX_TOOL_ITERATIONS=6
 AI_MAX_MESSAGE_LENGTH=2000
 AI_HISTORY_TURNS=6
+
+SEARCH_PROVIDER=${BRAVE_KEY_IN:+brave}
+SEARCH_HTTP_TIMEOUT=15
+BRAVE_SEARCH_API_KEY=${BRAVE_KEY_IN}
+BRAVE_SEARCH_COUNTRY=PH
 
 WORKFLOW_DAILY_FOLLOW_UP_REVIEW_ENABLED=true
 WORKFLOW_OPPORTUNITY_ATTENTION_REVIEW_ENABLED=true

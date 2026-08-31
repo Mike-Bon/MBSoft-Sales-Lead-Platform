@@ -22,6 +22,10 @@ use Illuminate\Support\Facades\Http;
  * and Anthropic's response back into AiCompletionResult. No other class
  * in this codebase knows Anthropic's wire format — that is exactly the
  * point of the LlmProvider interface (STEP 4).
+ *
+ * V2.0.0: retained as a selectable fallback (LLM_PROVIDER=anthropic).
+ * The default provider is now GeminiProvider. Reads the same
+ * provider-neutral config('services.llm.*') block.
  */
 class AnthropicProvider implements LlmProvider
 {
@@ -29,7 +33,7 @@ class AnthropicProvider implements LlmProvider
 
     public function complete(string $systemPrompt, array $messages, array $tools): AiCompletionResult
     {
-        $apiKey = config('services.anthropic.api_key');
+        $apiKey = config('services.llm.api_key');
 
         if (! $apiKey) {
             throw new AiProviderException('The AI assistant is not configured (missing API key).');
@@ -41,10 +45,10 @@ class AnthropicProvider implements LlmProvider
                 'anthropic-version' => self::API_VERSION,
                 'content-type' => 'application/json',
             ])
-                ->timeout((int) config('services.anthropic.timeout', 30))
+                ->timeout((int) config('services.llm.timeout', 30))
                 ->post('https://api.anthropic.com/v1/messages', [
-                    'model' => config('services.anthropic.model'),
-                    'max_tokens' => (int) config('services.anthropic.max_tokens', 1024),
+                    'model' => config('services.llm.model'),
+                    'max_tokens' => (int) config('services.llm.max_tokens', 1024),
                     'system' => $systemPrompt,
                     'messages' => $this->buildWireMessages($messages),
                     'tools' => $this->buildWireTools($tools),

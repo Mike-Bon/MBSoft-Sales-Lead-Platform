@@ -73,8 +73,10 @@ class AssistantService
         $interaction = new AgentInteraction;
         $interaction->user_id = $actor->id;
         $interaction->agent = $agentId->value;
-        $interaction->provider = 'anthropic';
-        $interaction->model = (string) config('services.anthropic.model');
+        // The provider/model actually in effect for this call — driven by
+        // LLM_PROVIDER / LLM_MODEL, never assumed (V2.0.0).
+        $interaction->provider = (string) config('services.llm.provider');
+        $interaction->model = (string) config('services.llm.model');
         $interaction->status = $response->status;
         // Bounded even though the Form Request already caps message
         // length — a second, independent safeguard against an

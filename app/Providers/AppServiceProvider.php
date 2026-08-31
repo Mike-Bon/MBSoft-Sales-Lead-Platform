@@ -17,6 +17,8 @@ use App\Services\Ai\Prompts\MarketIntelligenceAgentPrompt;
 use App\Services\Ai\Prompts\PerformanceAgentPrompt;
 use App\Services\Ai\Prompts\SalesAgentPrompt;
 use App\Services\Ai\Providers\AnthropicProvider;
+use App\Services\Ai\Providers\GeminiProvider;
+use App\Services\Ai\Providers\MisconfiguredLlmProvider;
 use App\Services\Ai\ToolRegistry;
 use App\Services\Ai\Tools\AnalyzeAccountTool;
 use App\Services\Ai\Tools\CheckProspectDuplicatesTool;
@@ -68,11 +70,24 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(EmailProvider::class, GmailEmailProvider::class);
         $this->app->bind(WhatsAppProvider::class, WhatsAppCloudApiProvider::class);
 
-        // Phase 7 STEP 4 / Phase 9 STEP 29: provider isolation for the
-        // AI layer. Every agent depends only on this interface — a
-        // future different provider needs one new class, never a
-        // rewrite of Agent, AgentRegistry, or any AgentTool.
-        $this->app->bind(LlmProvider::class, AnthropicProvider::class);
+        // Phase 7 STEP 4 / Phase 9 STEP 29 / V2.0.0: provider isolation
+        // for the AI layer. Every agent depends only on this interface;
+        // the concrete class is chosen by LLM_PROVIDER. Gemini is the
+        // default; Anthropic is a supported fallback. An unrecognised
+        // value is NOT silently swapped for a working provider — it
+        // binds MisconfiguredLlmProvider, which fails the same safe way
+        // a missing API key does (assistant unavailable, CRM unaffected,
+        // real reason logged). Same one-new-class-never-a-rewrite shape
+        // as the SearchProvider binding below.
+        $this->app->bind(LlmProvider::class, function ($app) {
+            $provider = $app['config']['services.llm.provider'];
+
+            return match ($provider) {
+                'gemini' => $app->make(GeminiProvider::class),
+                'anthropic' => $app->make(AnthropicProvider::class),
+                default => new MisconfiguredLlmProvider((string) $provider),
+            };
+        });
 
         // V2.1: external web search provider isolation. Only
         // ProspectDiscoveryService depends on this. No key configured

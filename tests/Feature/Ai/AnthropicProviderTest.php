@@ -24,7 +24,7 @@ class AnthropicProviderTest extends TestCase
     {
         parent::setUp();
 
-        config(['services.anthropic.api_key' => 'test-key', 'services.anthropic.model' => 'claude-sonnet-4-5-20250929']);
+        config(['services.llm.api_key' => 'test-key', 'services.llm.model' => 'claude-sonnet-4-5-20250929']);
     }
 
     public function test_a_text_only_response_is_parsed_correctly(): void
@@ -141,7 +141,7 @@ class AnthropicProviderTest extends TestCase
 
     public function test_a_missing_api_key_throws_immediately_without_a_request(): void
     {
-        config(['services.anthropic.api_key' => null]);
+        config(['services.llm.api_key' => null]);
         Http::fake();
 
         $this->expectException(AiProviderException::class);
@@ -153,7 +153,7 @@ class AnthropicProviderTest extends TestCase
 
     public function test_no_api_key_is_ever_present_in_the_completion_result(): void
     {
-        config(['services.anthropic.api_key' => 'super-secret-anthropic-key']);
+        config(['services.llm.api_key' => 'super-secret-anthropic-key']);
         Http::fake([
             'https://api.anthropic.com/v1/messages' => Http::response([
                 'content' => [['type' => 'text', 'text' => 'ok']],
