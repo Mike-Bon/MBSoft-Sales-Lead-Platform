@@ -49,7 +49,7 @@ class AgentRegistryTest extends TestCase
         }
 
         // Never a performance-calculation or drafting tool.
-        foreach (['get_my_performance', 'get_team_performance', 'draft_email', 'draft_whatsapp'] as $tool) {
+        foreach (['get_my_performance', 'get_team_performance', 'get_fiscal_performance', 'draft_email', 'draft_whatsapp'] as $tool) {
             $this->assertNull($tools->find($tool), "Sales Agent must not have {$tool}.");
         }
     }
@@ -58,7 +58,10 @@ class AgentRegistryTest extends TestCase
     {
         $tools = app(AgentRegistry::class)->get(AgentIdentifier::Performance)->tools;
 
-        foreach (['get_my_performance', 'get_team_performance', 'get_pipeline_summary'] as $tool) {
+        // get_fiscal_performance (FY2026 extension): OPERATIONAL fiscal
+        // performance from the corporate workbook — distinct from the CRM
+        // pipeline tools, same read-only + authorization-enforced shape.
+        foreach (['get_my_performance', 'get_team_performance', 'get_pipeline_summary', 'get_fiscal_performance'] as $tool) {
             $this->assertNotNull($tools->find($tool), "Performance Agent is missing {$tool}.");
         }
 
@@ -79,7 +82,7 @@ class AgentRegistryTest extends TestCase
 
         // No performance tools, no unrestricted search — STEP 14's list
         // is exhaustive.
-        foreach (['get_my_performance', 'get_team_performance', 'search_leads', 'search_opportunities', 'get_pipeline_summary'] as $tool) {
+        foreach (['get_my_performance', 'get_team_performance', 'get_fiscal_performance', 'search_leads', 'search_opportunities', 'get_pipeline_summary'] as $tool) {
             $this->assertNull($tools->find($tool), "Communication Agent must not have {$tool}.");
         }
     }
@@ -97,7 +100,7 @@ class AgentRegistryTest extends TestCase
             $this->assertNotNull($tools->find($tool), "Cost-to-Serve Agent is missing {$tool}.");
         }
 
-        foreach (['search_leads', 'get_lead', 'search_opportunities', 'get_opportunity', 'get_my_performance', 'get_team_performance', 'draft_email', 'draft_whatsapp', 'get_followups', 'get_communication_history'] as $tool) {
+        foreach (['search_leads', 'get_lead', 'search_opportunities', 'get_opportunity', 'get_my_performance', 'get_team_performance', 'get_fiscal_performance', 'draft_email', 'draft_whatsapp', 'get_followups', 'get_communication_history'] as $tool) {
             $this->assertNull($tools->find($tool), "Cost-to-Serve Agent must not have {$tool}.");
         }
     }
@@ -127,7 +130,7 @@ class AgentRegistryTest extends TestCase
             'create_lead', 'update_lead', 'assign_lead', 'send_email', 'send_whatsapp',
             'close_opportunity', 'update_opportunity', 'set_lead_status',
             'get_customer_revenue_summary', 'get_revenue_concentration', 'identify_revenue_exceptions',
-            'get_my_performance',
+            'get_my_performance', 'get_fiscal_performance',
         ] as $tool) {
             $this->assertNull($tools->find($tool), "Business Development Agent must not have {$tool}.");
         }
@@ -157,7 +160,7 @@ class AgentRegistryTest extends TestCase
         foreach ([
             'search_leads', 'get_lead', 'search_opportunities', 'get_opportunity', 'search_contacts', 'get_contact',
             'get_followups', 'get_communication_history', 'get_pipeline_summary',
-            'get_my_performance', 'get_team_performance',
+            'get_my_performance', 'get_team_performance', 'get_fiscal_performance',
             'draft_email', 'draft_whatsapp', 'send_email', 'send_whatsapp',
             'prioritize_leads', 'identify_stale_leads', 'analyze_account',
             'get_customer_revenue_summary', 'get_customer_engagement_summary',

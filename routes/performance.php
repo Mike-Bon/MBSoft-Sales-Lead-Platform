@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Performance\FiscalPerformanceController;
 use App\Http\Controllers\Performance\PerformanceController;
 use App\Http\Controllers\Performance\TargetController;
 use App\Http\Controllers\Performance\TeamPerformanceController;
@@ -23,6 +24,11 @@ Route::middleware(['auth', 'verified'])->name('performance.')->group(function ()
     Route::prefix('performance')->group(function () {
         Route::get('/', [PerformanceController::class, 'index'])->name('index');
         Route::get('/users/{user}', [PerformanceController::class, 'individual'])->name('individual');
+
+        // FY2026 Fiscal Performance extension: OPERATIONAL fiscal-year
+        // performance from the corporate workbook — a separate screen,
+        // never a replacement for the pipeline performance above.
+        Route::get('/fiscal', [FiscalPerformanceController::class, 'index'])->name('fiscal.index');
     });
 
     // STEP 14: the team performance drill-down (Manager: any team; Team

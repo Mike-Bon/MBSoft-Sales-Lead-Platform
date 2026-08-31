@@ -29,6 +29,7 @@ use App\Services\Ai\Tools\DraftWhatsAppTool;
 use App\Services\Ai\Tools\GetCommunicationHistoryTool;
 use App\Services\Ai\Tools\GetCustomerEngagementSummaryTool;
 use App\Services\Ai\Tools\GetCustomerRevenueSummaryTool;
+use App\Services\Ai\Tools\GetFiscalPerformanceTool;
 use App\Services\Ai\Tools\GetFollowupsTool;
 use App\Services\Ai\Tools\GetLeadTool;
 use App\Services\Ai\Tools\GetMyPerformanceTool;
@@ -149,6 +150,10 @@ class AppServiceProvider extends ServiceProvider
                         $app->make(GetMyPerformanceTool::class),
                         $app->make(GetTeamPerformanceTool::class),
                         $app->make(GetPipelineSummaryTool::class),
+                        // FY2026 Fiscal Performance extension: operational
+                        // (workbook) fiscal-year performance, distinct from
+                        // the CRM pipeline tools above.
+                        $app->make(GetFiscalPerformanceTool::class),
                         new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
                             KnowledgeType::Policy,
                             KnowledgeType::Training,

@@ -35,6 +35,7 @@
                 <flux:navlist.group heading="Performance">
                     <flux:navlist.item icon="flag" :href="route('performance.targets.index')" :current="request()->routeIs('performance.targets.*')" wire:navigate>Targets</flux:navlist.item>
                     <flux:navlist.item icon="chart-bar" :href="route('performance.index')" :current="request()->routeIs('performance.index')" wire:navigate>Performance</flux:navlist.item>
+                    <flux:navlist.item icon="calendar-days" :href="route('performance.fiscal.index')" :current="request()->routeIs('performance.fiscal.*')" wire:navigate>Fiscal Year Performance</flux:navlist.item>
                     {{-- Phase 12A: role-only check (never the combined
                          feature-switch check AgentIdentifier::
                          CostToServe->isAvailableTo() uses for the AI
