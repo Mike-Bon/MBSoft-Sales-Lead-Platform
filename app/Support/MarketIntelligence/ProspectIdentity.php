@@ -36,6 +36,10 @@ final readonly class ProspectIdentity
     public static function fromArray(array $input): self
     {
         $identity = is_array($input['identity'] ?? null) ? $input['identity'] : $input;
+        // V2.4's DuplicateCheckedProspect::toArray() nests the score
+        // fields under `carried_from_scoring`; V2.3's ScoredProspect
+        // keeps them at top level. Accept either.
+        $carried = is_array($input['carried_from_scoring'] ?? null) ? $input['carried_from_scoring'] : $input;
 
         return new self(
             business: trim((string) ($identity['business'] ?? $input['business'] ?? '')),
@@ -46,10 +50,10 @@ final readonly class ProspectIdentity
                 (array) ($identity['public_profiles'] ?? []),
                 fn ($v) => is_string($v) && trim($v) !== '',
             )),
-            totalScore: isset($input['total_score']) ? (int) $input['total_score'] : null,
-            priority: self::str($input['priority'] ?? null),
-            qualificationOutcome: self::str($input['qualification_outcome'] ?? null),
-            scoringModel: self::str($input['scoring_model'] ?? null),
+            totalScore: isset($carried['total_score']) ? (int) $carried['total_score'] : null,
+            priority: self::str($carried['priority'] ?? null),
+            qualificationOutcome: self::str($carried['qualification_outcome'] ?? null),
+            scoringModel: self::str($carried['scoring_model'] ?? null),
         );
     }
 

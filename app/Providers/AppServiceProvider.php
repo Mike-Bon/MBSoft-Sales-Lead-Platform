@@ -39,6 +39,7 @@ use App\Services\Ai\Tools\IdentifyFollowUpGapsTool;
 use App\Services\Ai\Tools\IdentifyMissingInformationTool;
 use App\Services\Ai\Tools\IdentifyRevenueExceptionsTool;
 use App\Services\Ai\Tools\IdentifyStaleLeadsTool;
+use App\Services\Ai\Tools\PrepareProspectForCrmTool;
 use App\Services\Ai\Tools\PrioritizeLeadsTool;
 use App\Services\Ai\Tools\QualifyProspectsTool;
 use App\Services\Ai\Tools\ScoreProspectsTool;
@@ -226,35 +227,45 @@ class AppServiceProvider extends ServiceProvider
                     allowedWorkflows: [],
                     maxToolIterations: $maxIterations,
                 ),
-                // V2.1–V2.4: the Market Intelligence agent — external
+                // V2.1–V2.5: the Market Intelligence agent — external
                 // prospect discovery, evidence-based qualification,
-                // transparent prioritisation scoring, and (V2.4) a
-                // single NARROW read-only CRM duplicate check. Same
+                // transparent prioritisation scoring, a single NARROW
+                // read-only CRM duplicate check (V2.4), and preparing a
+                // CRM lead PROPOSAL for a human to confirm (V2.5). Same
                 // single Agent engine; its entire ToolRegistry is
                 // discover_prospects + qualify_prospects + score_prospects
-                // + check_prospect_duplicates + a scoped search_knowledge.
+                // + check_prospect_duplicates + prepare_prospect_for_crm
+                // + a scoped search_knowledge.
                 //
-                // check_prospect_duplicates is the ONLY tool here with
-                // any CRM reach: a bounded, ScopesCrmQueries::scopeToUser
-                // -scoped SELECT of `organizations` identity columns.
-                // Still NO unrestricted CRM search, NO CRM write / lead
-                // creation / assignment / status change, NO draft/send
-                // tool, NO Cost-to-Serve tool, NO raw-query tool, NO
-                // external web research in the matcher. Duplicate
-                // classification is computed by ProspectDuplicateMatcher
-                // from deterministic signals, never by the model, and it
-                // never mutates the V2.3 score. Manager + Team Head only.
-                // No workflow. See docs/MARKET_INTELLIGENCE.md.
+                // check_prospect_duplicates is the only tool with CRM
+                // read reach (a scopeToUser-scoped SELECT of
+                // `organizations` identity columns).
+                // prepare_prospect_for_crm is PROPOSAL-ONLY: it persists
+                // one prospect_lead_proposals row and returns a review
+                // URL — it CANNOT create a Lead or Organization. The
+                // actual write happens only on an explicit human POST to
+                // ProspectLeadProposalController::confirm, through the
+                // existing V1 LeadService/OrganizationService, after a
+                // fresh duplicate re-check.
+                //
+                // Still NO unrestricted CRM search, NO create_lead /
+                // update_lead / assignment / status-change agent tool,
+                // NO draft/send tool, NO Cost-to-Serve tool, NO
+                // raw-query tool. Eligibility and duplicate status are
+                // computed by the application, never by the model.
+                // Manager + Team Head only. No workflow. See
+                // docs/MARKET_INTELLIGENCE.md.
                 new AgentDefinition(
                     identifier: AgentIdentifier::MarketIntelligence,
                     name: AgentIdentifier::MarketIntelligence->label(),
-                    purpose: 'External prospect discovery, qualification, prioritisation scoring, and a narrow authorised CRM duplicate check — no CRM writes, no contact.',
+                    purpose: 'External prospect discovery, qualification, prioritisation scoring, a narrow authorised CRM duplicate check, and preparing a human-confirmed CRM lead proposal — the AI never creates the lead itself.',
                     systemPrompt: MarketIntelligenceAgentPrompt::text(),
                     tools: new ToolRegistry([
                         $app->make(DiscoverProspectsTool::class),
                         $app->make(QualifyProspectsTool::class),
                         $app->make(ScoreProspectsTool::class),
                         $app->make(CheckProspectDuplicatesTool::class),
+                        $app->make(PrepareProspectForCrmTool::class),
                         new SearchKnowledgeTool($app->make(KnowledgeSearchService::class), [
                             KnowledgeType::SalesPlaybook,
                             KnowledgeType::ProductGuide,

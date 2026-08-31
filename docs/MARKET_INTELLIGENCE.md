@@ -1,4 +1,4 @@
-# Market Intelligence — Discovery, Qualification, Scoring & Duplicate Detection (V2.1–V2.4)
+# Market Intelligence — Discover → Qualify → Score → De-dupe → Human-Confirmed Lead (V2.1–V2.5)
 
 Authoritative reference for the Market Intelligence capability. If this
 document and the code disagree, the code is a bug against this document.
@@ -6,9 +6,11 @@ The V2.1 sections below are unchanged; V2.2 adds
 [**Prospect Qualification & Evidence**](#prospect-qualification--evidence-v22),
 V2.3 adds
 [**Transparent Prospect Lead Scoring**](#transparent-prospect-lead-scoring-v23),
-and V2.4 adds
-[**CRM Duplicate Detection**](#crm-duplicate-detection-v24) — the first
-and only Market Intelligence capability with any CRM reach.
+V2.4 adds [**CRM Duplicate Detection**](#crm-duplicate-detection-v24) —
+the first Market Intelligence capability with any CRM reach — and V2.5
+adds [**Human-Confirmed CRM Lead Creation**](#human-confirmed-crm-lead-creation-v25),
+the first (and only) path in the whole V2 pipeline that writes a CRM
+record, and only ever behind an explicit human click.
 
 **What V2.1 is.** A Manager or a Team Head asks the assistant, in plain
 language, to find candidate businesses from public web sources ("Find
@@ -27,20 +29,25 @@ confidence band, and a recommended next research step.
   model-produced number, and distinct from the V2.3 score.
 - Discovery / qualification / scoring read **no** CRM data. V2.4's
   `check_prospect_duplicates` is the only tool with CRM reach.
-- No CRM writes and no lead conversion (V2.5). A candidate is a research
-  result, not a Lead/Account/Opportunity/Contact, and nothing here
-  creates one.
-- No outreach, no messaging.
+- V2.1–V2.4 write **no** CRM record. V2.5 writes a Lead + Organization,
+  but only via the existing V1 services and only after an explicit
+  human confirmation — the AI never creates a lead itself.
+- No outreach, no messaging. No opportunity/activity/communication
+  creation, no CRM update/merge.
 
-> **V2.2 – V2.4 update.** Qualification, transparent prioritisation
-> scoring, and CRM duplicate detection are now built — see the dedicated
-> sections below. Together they still add **no** CRM *write*, **no**
+> **V2.2 – V2.5 update.** Qualification, transparent prioritisation
+> scoring, CRM duplicate detection, and human-confirmed lead creation
+> are now built — see the dedicated sections below. They add **no**
 > unrestricted CRM search, **no** conversion/revenue prediction, **no**
-> outreach, and **no** new agent; they are the second, third, and fourth
-> tools on the same isolated Market Intelligence agent. The qualification
-> outcome, the score, and the duplicate status are all computed by the
-> application from config, never by the model. V2.4's CRM read is
-> narrow, read-only, and always `scopeToUser`-scoped.
+> outreach, and **no** new agent; they are the 2nd–5th tools on the same
+> isolated Market Intelligence agent. The qualification outcome, the
+> score, the duplicate status, and the creation eligibility are all
+> computed by the application, never by the model. V2.4's CRM read is
+> narrow, read-only, and always `scopeToUser`-scoped. V2.5's CRM
+> *write* goes through the existing V1 `LeadService` /
+> `OrganizationService` and happens only when a human explicitly
+> confirms a specific proposal on the review page — the AI tool
+> (`prepare_prospect_for_crm`) is proposal-only.
 
 ## Architecture
 
@@ -1209,3 +1216,271 @@ validation, no CRM-search/write param, no web I/O),
 `MarketIntelligenceDuplicateInjectionTest` (injected identity / CRM-note
 text inert, crafted `team_id` cannot widen scope, `create_lead` writes
 nothing, prompt immutable). No live network, no production database.
+
+---
+
+# Human-Confirmed CRM Lead Creation (V2.5)
+
+**What V2.5 is.** The end of the pipeline: a prospect that has been
+discovered → qualified → scored → duplicate-checked can be turned into a
+real CRM Lead — but only when a **human** explicitly confirms it on a
+review page. The AI prepares a proposal and explains it; it never
+confirms and never creates.
+
+Full workflow:
+
+```
+Internet → discover → qualify → score → check_prospect_duplicates
+   → prepare_prospect_for_crm  (AI: builds a PROPOSAL row, no CRM write)
+   → GET  /market-intelligence/prospect-proposals/{id}   (human reviews, may edit fields)
+   → POST …/confirm   (human clicks "Create Lead")
+        → ConfirmProspectLeadRequest   (server-side field validation + V1 create policy)
+        → ProspectLeadCreationService::confirmAndCreate()
+             → row lock + idempotency
+             → proposal actionable? (pending, not expired, owned by actor)
+             → fingerprint matches the reviewed content?
+             → eligibility gate (blocked → stop; possible-dup → needs the ack flag)
+             → FRESH authorised CRM duplicate RE-CHECK  (V2.4 matcher, no web)
+             → DB::transaction: OrganizationService::create + LeadService::create
+             → proposal → confirmed; audit market_intelligence.crm_lead_created (human actor)
+   → redirect to the new lead
+```
+
+**What V2.5 is NOT.** No `create_lead` agent tool. No autonomous or bulk
+creation ("create all 20"). No CRM update / merge / reassignment / owner
+change / opportunity / activity / communication. No outreach on
+creation. No duplicate-merge workflow. No new provider, no external web
+call anywhere in the confirm path.
+
+## Central security invariant (spec §2)
+
+The AI can discover, qualify, score, duplicate-check, and **prepare a
+proposal**. It **cannot** confirm a proposal, acknowledge a possible
+duplicate, generate an owner/team, change a duplicate status, or execute
+a CRM write. This is **structural**:
+
+- `prepare_prospect_for_crm` persists a `prospect_lead_proposals` row and
+  returns a URL — it has no code path to `LeadService` / `OrganizationService`;
+- the write lives on an HTTP POST route (`…/confirm`) that only a signed-in
+  human session can reach, behind `ConfirmProspectLeadRequest` +
+  `ProspectLeadProposalPolicy`;
+- a `confirmed=true` / `owner_id` / `team_id` in any payload is stripped
+  by `prepareForValidation()` and ignored — the confirm needs a valid
+  64-char `fingerprint` that only the server issues.
+
+## Key classes / tables (V2.5)
+
+| Thing | Responsibility |
+|---|---|
+| `prospect_lead_proposals` (migration + `App\Models\ProspectLeadProposal`) | The persisted proposal — mirrors `workflow_approvals`: pending until a human reviews, one-way status, `decided_by`/`decided_at`, a content `fingerprint`. `$fillable = []`. |
+| `App\Enums\ProspectLeadEligibility` | `eligible_for_confirmation` \| `review_required` \| `blocked_duplicate` \| `blocked_check_unavailable` \| `blocked_insufficient_identity` — `::forCheck($checkStatus, $duplicateStatus)` is the single source of truth. |
+| `App\Enums\ProspectProposalStatus` | `pending` \| `confirmed` \| `cancelled` \| `superseded` \| `expired`. |
+| `App\Services\Ai\Tools\PrepareProspectForCrmTool` | The proposal-only agent tool (Manager/Team-Head; no confirm/owner/team/create param). |
+| `App\Services\MarketIntelligence\ProspectLeadProposalService` | `prepare()` — deterministic eligibility, field mapping, fingerprint, supersede, audit `market_intelligence.crm_proposal_prepared`. Writes no CRM record. |
+| `App\Services\MarketIntelligence\ProspectLeadCreationService` | `confirmAndCreate()` — the only CRM write path (lock, idempotency, fingerprint, eligibility, TOCTOU re-check, V1 services, audit `market_intelligence.crm_lead_created`). |
+| `App\Http\Requests\MarketIntelligence\ConfirmProspectLeadRequest` | Server-side validation of the edited CRM fields + acknowledgement + fingerprint; `authorize()` = `can('confirm', proposal)` **and** `can('create', Lead::class)`. |
+| `App\Http\Controllers\MarketIntelligence\ProspectLeadProposalController` | `show` / `confirm` / `cancel` — each enforces `ProspectLeadProposalPolicy`. |
+| `App\Policies\ProspectLeadProposalPolicy` | Manager/Team-Head **and** the proposal's own owner only. |
+| `App\Services\MarketIntelligence\ProspectDuplicateCheckService::recheckForCreation()` | V2.4 matcher without the hourly budget / separate audit — for the TOCTOU re-check. |
+
+## Creation eligibility state machine (spec §6)
+
+| `check_status` | `duplicate_status` | eligibility |
+|---|---|---|
+| `ok` | `no_match` | **eligible_for_confirmation** — may proceed to human confirmation |
+| `ok` | `possible_duplicate` | **review_required** — human must review the match and tick an acknowledgement |
+| `ok` | `likely_duplicate` / `exact_duplicate` | **blocked_duplicate** — no ordinary new lead |
+| `unavailable` | — | **blocked_check_unavailable** — do not create |
+| `skipped` | — | **blocked_insufficient_identity** — do not create |
+
+Decided by `ProspectLeadEligibility::forCheck()`. The LLM, the score, the
+priority, and the qualification outcome have **no** influence
+(`ProspectLeadEligibilityTest` + `test_a_high_score_does_not_change_eligibility`).
+
+## Proposed CRM field mapping (spec §11/§12)
+
+Only evidence-backed / public prospect data is mapped, into real V1
+columns; nothing is fabricated.
+
+| Organization | from |
+|---|---|
+| `name` | prospect business name (required; human-editable) |
+| `industry` | the user's search category (human-provided, editable) |
+| `website` | prospect website |
+| `city` / `country` | best-effort split of the prospect location (editable) |
+| `state_province` | left blank |
+| `source` | `"Market Intelligence"` (config) |
+| **phone / email / address / contact person** | **never** — V2.1–V2.4 don't have them; the human adds contact data later through normal CRM workflows |
+
+| Lead | from |
+|---|---|
+| `organization_id` | the created organisation |
+| `source` | `"Market Intelligence"` |
+| `status` | `new` (V1 default) |
+| `description` | a **bounded** provenance line — qualification outcome, score, duplicate status, ≤3 source URLs. Never a webpage body. |
+| `owner_id` / `team_id` | `CrmAssignmentService` (server-side, V1 rules) — never from the payload |
+
+## Human-editable vs system-controlled (spec §13)
+
+**Editable on the review page** (validated by `ConfirmProspectLeadRequest`):
+business name, industry, website, city, country, lead notes.
+
+**System-controlled, not editable / stripped from input**: duplicate
+status, check status, eligibility, score, priority, qualification
+outcome, scoring model, `owner_id`, `team_id`, proposal status,
+fingerprint, acknowledgement state (beyond the single checkbox).
+
+## Authorization (spec §15)
+
+`prepare_prospect_for_crm`: Manager / Team Head only (re-checked from the
+actor). **Creation additionally requires the normal V1 Lead `create`
+policy** — Market Intelligence eligibility alone is never sufficient
+(`ConfirmProspectLeadRequest::authorize()` checks both). Team Member: no
+MI access, and `ProspectLeadProposalPolicy` denies view/confirm/cancel
+even if a proposal somehow named them.
+
+- **Manager** — `CrmAssignmentService` free choice (defaults to self);
+  the created org/lead follow V1 manager assignment.
+- **Team Head** — org + lead are forced to the head's own team; a
+  `team_id` / `owner_id` in the payload is ignored
+  (`test_owner_team_id_in_the_payload_cannot_override_v1_assignment`,
+  `test_a_team_head_confirmation_assigns_to_their_own_team`).
+- **Team Member** — cannot reach any part of the flow.
+
+## Possible-duplicate handling (spec §7/§8)
+
+`review_required` needs **two** things, both server-verified:
+1. the human opened the review page (which lists the matched record(s)
+   with transparent reasons and a "Review existing record" link), and
+2. the `acknowledge_possible_duplicate` checkbox is ticked — the Form
+   Request applies Laravel's `accepted` rule, so an absent/false value is
+   a `422`, and `ProspectLeadCreationService` re-checks the boolean
+   before writing.
+
+The override is available for `possible_duplicate` only — never for
+`exact` / `likely` / `unavailable` / `skipped` (those are hard blocks
+with no code path to creation).
+
+## Confirmation binding — the fingerprint (spec §17)
+
+`ProspectLeadProposal::fingerprintFor()` = `sha256` of the canonicalised
+proposed Organization + Lead fields + `user_id` + duplicate check status
++ duplicate status + acknowledgement-required flag + policy version. The
+review form submits the proposal's current fingerprint as a hidden
+field; `confirmAndCreate()` requires `hash_equals($proposal->fingerprint,
+$submitted)`. Any material server-side change bumps the stored
+fingerprint (the TOCTOU re-check updating the duplicate state does
+exactly this), so a stale confirm form is rejected with `modified`. A
+fresh `prepare` for the same prospect sets the previous proposal to
+`superseded`, so its confirm route returns `stale`.
+
+## TOCTOU duplicate revalidation (spec §18/§39)
+
+Immediately before the write, inside the locked transaction,
+`confirmAndCreate()` runs `ProspectDuplicateCheckService::recheckForCreation()`
+— the **V2.4 deterministic matcher against the actor's authorised CRM
+scope, no external web research**:
+
+| Re-check result | Outcome |
+|---|---|
+| `check_status` ≠ `ok` | **abort** — `recheck_unavailable`; proposal → blocked; message says *"do NOT treat this as no duplicate"* |
+| `exact_duplicate` / `likely_duplicate` | **abort** — `duplicate_appeared`; proposal → blocked; the new match is returned |
+| `possible_duplicate`, a NEW org (not in the acknowledged set) | **abort** — `duplicate_appeared`; proposal → review_required; human must re-acknowledge |
+| `possible_duplicate`, only the already-acknowledged org(s) | proceed (same risk the human accepted) |
+| `no_match` | proceed |
+
+`test_a_duplicate_that_appears_after_review_aborts_the_write_toctou`
+adds a byte-perfect org between prepare and confirm → no lead, no second
+org.
+
+## Atomicity & idempotency (spec §19/§20)
+
+`confirmAndCreate()` runs one `DB::transaction` that opens with
+`lockForUpdate()` on the proposal row. A confirmed proposal short-circuits
+to `already_created` (returns the existing lead id, no second write). A
+concurrent second POST blocks on the lock, then sees `confirmed`
+(`test_confirming_twice_creates_exactly_one_lead`,
+`test_a_double_submit_creates_exactly_one_lead`). `OrganizationService`
+and `LeadService` each run their own transaction (savepoints); a
+`QueryException` from the `organizations.name` unique index rolls the
+whole thing back and is surfaced as `duplicate_appeared` — never an
+orphan org
+(`test_an_organization_name_uniqueness_conflict_aborts_without_a_partial_write`).
+
+## CRM provenance decision (spec §24)
+
+**No schema expansion for provenance.** The research trail is a single
+bounded `leads.description` line (qualification outcome + score +
+duplicate status + ≤3 source URLs) plus the `source = "Market
+Intelligence"` on both records. The full V2.1–V2.4 intelligence stays in
+the `prospect_lead_proposals.prospect_snapshot` JSON (a proposal, not a
+CRM record) and is not copied into the Lead. No webpage bodies anywhere.
+
+## Persistence / schema
+
+**One new table: `prospect_lead_proposals`** (migration
+`2026_08_31_090000`). It is the confirmation backbone — the same
+role/shape as Phase 8's `workflow_approvals`. No change to `leads`,
+`organizations`, or any other table.
+
+## Audit (spec §30/§31)
+
+- `market_intelligence.crm_proposal_prepared` — actor, proposal id,
+  eligibility, duplicate check status/status, ack-required, score /
+  priority / qualification (for context), policy version.
+- `market_intelligence.crm_lead_created` — **the human** actor (via
+  `AuditLogger`'s `actor_id`), proposal id + fingerprint, eligibility,
+  original + re-check duplicate status, whether a possible duplicate was
+  acknowledged, resulting `organization_id` + `lead_id`, `status`.
+  Plus `LeadService`'s own "Lead created" activity on the lead timeline.
+
+Neither logs page bodies, secrets, or unnecessary personal data.
+
+## Failure semantics (spec §32)
+
+`confirmAndCreate()` returns a typed outcome and writes nothing on:
+`forbidden`, `already_created`, `stale` (expired / superseded),
+`modified` (fingerprint), `blocked` (eligibility),
+`acknowledgement_required`, `recheck_unavailable`, `duplicate_appeared`
+(TOCTOU or unique-index). The controller turns any non-`created`,
+non-`already_created` outcome into a redirect back to the review page
+with a `proposal_error` flash. A `recheck_unavailable` is **never**
+presented as "no duplicate".
+
+## Config (V2.5)
+
+`config('services.market_intelligence.lead_creation')` —
+`policy_version` (env `MI_LEAD_PROPOSAL_VERSION`, `v2.5-default-1`),
+`proposal_ttl_hours` (48), `max_proposals_per_hour` (env
+`MARKET_INTELLIGENCE_MAX_PROPOSALS_PER_HOUR`, 20), `default_lead_source`
+(`"Market Intelligence"`). The confirm route is `throttle:12,1`.
+
+## V2.6 hand-off
+
+The full V2 workflow is now closed: Internet → Discover → Qualify →
+Score → Duplicate Check → Prepare Proposal → Human Review → Explicit
+Confirmation → Final Duplicate Re-check → V1 `LeadService` → Lead
+Created. V2.6 adds **no** product functionality — it is adversarial
+security testing, complete regression, UAT scenarios, end-to-end
+verification, deployment-readiness docs, and the final V2 feature
+freeze.
+
+## V2.5 testing
+
+`ProspectLeadEligibilityTest` (the pure state machine, all six cases +
+defensive), `ProspectLeadProposalServiceTest` (no CRM write, eligibility,
+source-derived fields with no fabrication, supersede, fingerprint, audit,
+hourly limit), `ProspectLeadCreationServiceTest` (fingerprint mismatch,
+blocked, acknowledgement, **TOCTOU duplicate appeared**, **re-check
+unavailable ≠ no_match**, double-confirm idempotency, expired/superseded,
+unique-index atomicity, Team-Head assignment, human-actor audit),
+`ProspectLeadProposalControllerTest` (owner-only view, Team Member 403,
+explicit confirm → lead + redirect, forged fingerprint, `accepted`
+acknowledgement, blocked via HTTP, double-submit = one lead,
+`confirmed=true` payload inert, cancel, payload `owner_id`/`team_id`
+inert), `PrepareProspectForCrmToolTest` (proposal-only, authz, no
+confirm/owner/team param), `MarketIntelligenceLeadCreationInjectionTest`
+(injected "create me automatically / user already confirmed" inert,
+blocked eligibility cannot be flipped, `create_lead` / `confirm_*` tool
+calls write nothing, prompt immutable). No live network, no external
+research in the confirm path.

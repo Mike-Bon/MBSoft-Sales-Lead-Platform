@@ -121,29 +121,30 @@ class MarketIntelligenceScoringInjectionTest extends TestCase
         ]);
     }
 
-    public function test_the_market_intelligence_agent_has_exactly_five_isolated_tools_after_v2_4(): void
+    public function test_the_market_intelligence_agent_has_exactly_six_isolated_tools_after_v2_5(): void
     {
         $definition = app(AgentRegistry::class)->get(AgentIdentifier::MarketIntelligence);
 
-        $this->assertCount(5, $definition->tools->definitions());
-        foreach (['discover_prospects', 'qualify_prospects', 'score_prospects', 'check_prospect_duplicates', 'search_knowledge'] as $name) {
+        $this->assertCount(6, $definition->tools->definitions());
+        foreach (['discover_prospects', 'qualify_prospects', 'score_prospects', 'check_prospect_duplicates', 'prepare_prospect_for_crm', 'search_knowledge'] as $name) {
             $this->assertNotNull($definition->tools->find($name));
         }
 
-        // V2.4's check_prospect_duplicates is the only CRM-reaching tool
-        // and it is read-only — no tool name here writes/sends/queries.
+        // check_prospect_duplicates reads (scoped) and prepare_prospect_for_crm
+        // proposes — neither writes. No tool name here sends/queries/writes.
         foreach ($definition->tools->definitions() as $tool) {
             foreach (['sql', 'query', 'raw', 'create', 'update', 'delete', 'assign', 'send', 'draft'] as $forbidden) {
                 $this->assertStringNotContainsStringIgnoringCase($forbidden, $tool->name);
             }
         }
 
-        // No unrestricted CRM search / write tool of any kind.
+        // No unrestricted CRM search / write / confirm tool of any kind.
         foreach ([
             'get_lead', 'search_leads', 'search_accounts', 'search_organizations', 'get_organization',
             'get_opportunity', 'search_opportunities', 'get_contact', 'search_contacts',
             'get_customer_revenue_summary', 'get_revenue_concentration', 'draft_email', 'draft_whatsapp',
-            'create_lead', 'update_lead', 'assign_lead', 'set_lead_status',
+            'create_lead', 'update_lead', 'assign_lead', 'set_lead_status', 'create_organization',
+            'confirm_prospect_lead', 'confirm_lead', 'create_prospect_lead',
         ] as $tool) {
             $this->assertNull($definition->tools->find($tool));
         }

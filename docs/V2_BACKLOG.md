@@ -10,17 +10,24 @@ per CLAUDE.md's phase discipline.
 > Market Intelligence & Prospect Discovery"). "External
 > prospecting/enrichment systems" and "a new AI-agent role" below were
 > Phase-11-era exclusions; V2 explicitly reopened external prospect
-> **discovery**, **qualification**, **scoring**, and **CRM duplicate
-> detection**. Built so far (a sixth, isolated `MarketIntelligence`
-> agent — four tools — `docs/MARKET_INTELLIGENCE.md`): **V2.1 — External
-> Prospect Discovery**, **V2.2 — Prospect Qualification & Evidence**,
-> **V2.3 — Transparent Prospect Lead Scoring** (deterministic
-> config-backed 100-point model, priority bands, ranking; never a
-> conversion probability), and **V2.4 — CRM Duplicate Detection** (one
-> narrow read-only `scopeToUser`-scoped `organizations` lookup;
+> **discovery**, **qualification**, **scoring**, **CRM duplicate
+> detection**, and **human-confirmed CRM lead creation**. Built so far
+> (a sixth, isolated `MarketIntelligence` agent — five tools —
+> `docs/MARKET_INTELLIGENCE.md`): **V2.1 — External Prospect Discovery**,
+> **V2.2 — Prospect Qualification & Evidence**, **V2.3 — Transparent
+> Prospect Lead Scoring** (deterministic config-backed 100-point model;
+> never a conversion probability), **V2.4 — CRM Duplicate Detection**
+> (one narrow read-only `scopeToUser`-scoped `organizations` lookup;
 > deterministic exact/likely/possible/no_match; restricted records stay
-> invisible; no CRM write, no unrestricted CRM search, no new table).
-> V2.5–V2.6 remain not started and still require explicit go-ahead.
+> invisible), and **V2.5 — Human-Confirmed CRM Lead Creation** (the AI
+> `prepare_prospect_for_crm` tool is proposal-only; the lead is written
+> by the existing V1 `LeadService`/`OrganizationService` only on an
+> explicit human "Create Lead" click, behind a content fingerprint,
+> an eligibility state machine, and a fresh CRM duplicate re-check;
+> one new table `prospect_lead_proposals`, no other schema change).
+> **V2.6** (adversarial security testing, full regression, UAT,
+> end-to-end verification, deployment-readiness docs, V2 feature freeze)
+> is not started and still requires explicit go-ahead.
 
 ## Explicitly out of scope per Phase 11's instruction
 

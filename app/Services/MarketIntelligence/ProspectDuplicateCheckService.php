@@ -79,6 +79,20 @@ final class ProspectDuplicateCheckService
         ]);
     }
 
+    /**
+     * V2.5 (spec §18): a single authorised CRM duplicate re-check used by
+     * ProspectLeadCreationService immediately before it writes a lead, to
+     * close the time-of-check/time-of-use gap. It does NOT consume the
+     * per-user hourly duplicate-check budget and does NOT emit the
+     * `market_intelligence.duplicate_check` audit event (the re-check
+     * outcome is recorded in the `crm_lead_created` audit instead). It
+     * runs no external web research — same deterministic scoped matcher.
+     */
+    public function recheckForCreation(User $actor, ProspectIdentity $identity, DuplicateMatchPolicy $policy): DuplicateCheckedProspect
+    {
+        return $this->checkOne($actor, $identity, $policy, $this->scopeNote($actor));
+    }
+
     private function checkOne(User $actor, ProspectIdentity $identity, DuplicateMatchPolicy $policy, string $scopeNote): DuplicateCheckedProspect
     {
         if (! $identity->isCheckable()) {

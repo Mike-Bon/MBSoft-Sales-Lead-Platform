@@ -102,6 +102,14 @@ class AgentRouterTest extends TestCase
         $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('Check these businesses for existing CRM records before we add them.'));
     }
 
+    public function test_a_prospect_to_crm_request_routes_to_market_intelligence(): void
+    {
+        $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('Add this prospect to the CRM.'));
+        $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('Turn this prospect into a lead.'));
+        $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('Prepare the prospect for CRM creation.'));
+        $this->assertSame(AgentIdentifier::MarketIntelligence, (new AgentRouter)->route('Create a lead from this prospect research.'));
+    }
+
     public function test_draft_a_whatsapp_routes_to_communication(): void
     {
         $this->assertSame(AgentIdentifier::Communication, (new AgentRouter)->route('Draft a WhatsApp to John.'));

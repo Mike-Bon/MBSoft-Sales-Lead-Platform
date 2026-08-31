@@ -169,4 +169,34 @@ class ProspectFixtures
             hasOpportunity: $v['has_opportunity'],
         );
     }
+
+    /**
+     * A `DuplicateCheckedProspect::toArray()`-shaped array — the input
+     * to prepare_prospect_for_crm (V2.5).
+     *
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    public static function duplicateCheckResult(array $overrides = []): array
+    {
+        return array_merge([
+            'business' => 'ABC Beauty Corporation',
+            'website' => 'https://abcbeauty.ph/',
+            'domain' => 'abcbeauty.ph',
+            'check_status' => 'ok',
+            'duplicate_status' => 'no_match',
+            'duplicate_status_label' => 'NO MATCH',
+            'candidate_matches' => [],
+            'candidates_examined' => 3,
+            'match_policy' => 'v2.4-default-1',
+            'scope_note' => 'Checked every organisation in the CRM.',
+            'next_action' => 'No match in your authorised CRM view — eligible for human review before CRM creation.',
+            'carried_from_scoring' => [
+                'total_score' => 84,
+                'priority' => 'high',
+                'qualification_outcome' => 'strong_match',
+                'scoring_model' => 'v2.3-default-1',
+            ],
+        ], $overrides);
+    }
 }

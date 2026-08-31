@@ -134,23 +134,25 @@ class AgentRegistryTest extends TestCase
     }
 
     /**
-     * V2.1–V2.4: the sixth agent's own tool set — external prospect
-     * discovery, qualification, prioritisation scoring, and a single
-     * narrow read-only CRM duplicate check. discover_prospects +
-     * qualify_prospects + score_prospects + check_prospect_duplicates + a
-     * scoped search_knowledge, and NOTHING that runs an unrestricted CRM
-     * search, writes to the CRM, touches communications, performance, or
-     * Cost-to-Serve. The absent tools below are the structural boundary.
+     * V2.1–V2.5: the sixth agent's own tool set — external prospect
+     * discovery, qualification, prioritisation scoring, a single narrow
+     * read-only CRM duplicate check, and preparing a human-confirmed CRM
+     * lead proposal. discover_prospects + qualify_prospects +
+     * score_prospects + check_prospect_duplicates + prepare_prospect_for_crm
+     * + a scoped search_knowledge, and NOTHING that runs an unrestricted
+     * CRM search, WRITES to the CRM, touches communications, performance,
+     * or Cost-to-Serve. The absent tools below are the structural
+     * boundary — prepare_prospect_for_crm is proposal-only.
      */
     public function test_market_intelligence_agent_has_the_documented_tool_set_and_no_others(): void
     {
         $tools = app(AgentRegistry::class)->get(AgentIdentifier::MarketIntelligence)->tools;
 
-        foreach (['discover_prospects', 'qualify_prospects', 'score_prospects', 'check_prospect_duplicates', 'search_knowledge'] as $tool) {
+        foreach (['discover_prospects', 'qualify_prospects', 'score_prospects', 'check_prospect_duplicates', 'prepare_prospect_for_crm', 'search_knowledge'] as $tool) {
             $this->assertNotNull($tools->find($tool), "Market Intelligence Agent is missing {$tool}.");
         }
 
-        $this->assertCount(5, $tools->definitions(), 'Market Intelligence Agent must have exactly five tools.');
+        $this->assertCount(6, $tools->definitions(), 'Market Intelligence Agent must have exactly six tools.');
 
         foreach ([
             'search_leads', 'get_lead', 'search_opportunities', 'get_opportunity', 'search_contacts', 'get_contact',
@@ -160,7 +162,7 @@ class AgentRegistryTest extends TestCase
             'prioritize_leads', 'identify_stale_leads', 'analyze_account',
             'get_customer_revenue_summary', 'get_customer_engagement_summary',
             'get_revenue_concentration', 'compare_account_period', 'identify_revenue_exceptions',
-            'create_lead', 'update_lead', 'assign_lead', 'set_lead_status',
+            'create_lead', 'update_lead', 'assign_lead', 'set_lead_status', 'create_organization', 'confirm_prospect_lead',
         ] as $tool) {
             $this->assertNull($tools->find($tool), "Market Intelligence Agent must not have {$tool}.");
         }

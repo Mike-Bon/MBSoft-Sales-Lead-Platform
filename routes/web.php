@@ -31,3 +31,4 @@ require __DIR__.'/knowledge.php';
 require __DIR__.'/notifications.php';
 require __DIR__.'/cost-to-serve.php';
 require __DIR__.'/business-development.php';
+require __DIR__.'/market-intelligence.php';

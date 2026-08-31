@@ -15,24 +15,28 @@ identical tool-enforced authorization.
 > **Later additions.** Phase 9 shipped three agents; Phase 12 added a
 > fourth (**Cost-to-Serve Intelligence** — see `docs/COST_TO_SERVE.md`),
 > Phase 13 a fifth (**Business Development** — see
-> `docs/BUSINESS_DEVELOPMENT.md`), and V2.1–V2.4 a sixth (**Market
+> `docs/BUSINESS_DEVELOPMENT.md`), and V2.1–V2.5 a sixth (**Market
 > Intelligence** — external prospect discovery, evidence-based
-> qualification, transparent prioritisation scoring, and a narrow
-> read-only CRM duplicate check, see `docs/MARKET_INTELLIGENCE.md`).
-> Each is the same single `Agent` engine with a different
-> `AgentDefinition` — no orchestrator, no swarm, no agent-to-agent calls
-> were added. Everything below about the engine, routing,
-> `AgentPromptRules`, the audit trail, and the no-autonomy boundaries
-> applies to all six agents; only the counts and the per-agent tool
-> tables in this Phase 9 document were not retro-edited.
-> `AgentRegistryTest.php` is the authoritative, always-current tool
-> permission matrix for every agent. The Market Intelligence agent is
-> the one whose tools reach *outside* the application (public web search
-> + public page fetches, always behind `OutboundUrlGuard`); its only CRM
-> reach is V2.4's `check_prospect_duplicates` — a bounded,
-> `ScopesCrmQueries::scopeToUser`-scoped, read-only lookup of
-> organisation identity fields, with no CRM write and no unrestricted
-> CRM search. It has no communication or Cost-to-Serve tool at all.
+> qualification, transparent prioritisation scoring, a narrow read-only
+> CRM duplicate check, and preparing a human-confirmed CRM lead
+> proposal, see `docs/MARKET_INTELLIGENCE.md`). Each is the same single
+> `Agent` engine with a different `AgentDefinition` — no orchestrator,
+> no swarm, no agent-to-agent calls were added. Everything below about
+> the engine, routing, `AgentPromptRules`, the audit trail, and the
+> no-autonomy boundaries applies to all six agents; only the counts and
+> the per-agent tool tables in this Phase 9 document were not
+> retro-edited. `AgentRegistryTest.php` is the authoritative,
+> always-current tool permission matrix for every agent. The Market
+> Intelligence agent is the one whose tools reach *outside* the
+> application (public web search + public page fetches, always behind
+> `OutboundUrlGuard`); its only CRM read is V2.4's
+> `check_prospect_duplicates` (a bounded, `ScopesCrmQueries::scopeToUser`
+> -scoped, read-only organisation identity lookup), and its only path
+> toward a CRM *write* is V2.5's `prepare_prospect_for_crm`, which is
+> PROPOSAL-ONLY — the lead is created by the existing V1 `LeadService`
+> only after an explicit human confirmation on a review page, never by
+> the agent. No unrestricted CRM search, no communication, no
+> Cost-to-Serve tool at all.
 
 ## Architecture
 

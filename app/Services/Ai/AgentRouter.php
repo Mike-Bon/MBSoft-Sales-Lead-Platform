@@ -100,6 +100,12 @@ final class AgentRouter
         'already in our crm', 'already in crm', 'already a lead', 'already exist',
         'do we already have', 'is this prospect already', 'are these prospects already',
         'existing crm record', 'crm duplicate', 'prospect duplicate', 'de-dupe', 'dedupe',
+        // V2.5 — human-confirmed CRM lead creation (preparation only)
+        'add this prospect', 'add the prospect', 'add these prospects', 'add this to the crm',
+        'add to the crm', 'add it to the crm', 'create this prospect as a lead',
+        'turn this prospect into a lead', 'turn the prospect into a lead', 'make this prospect a lead',
+        'prepare this prospect', 'prepare the prospect for', 'prepare for crm',
+        'create a lead from this prospect', 'add this business as a lead', 'convert this prospect',
     ];
 
     public function route(string $message): AgentIdentifier

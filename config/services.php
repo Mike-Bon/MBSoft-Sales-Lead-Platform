@@ -288,6 +288,21 @@ return [
             // Per-user duplicate-check calls allowed per rolling hour.
             'max_checks_per_hour' => env('MARKET_INTELLIGENCE_MAX_DUP_PER_HOUR', 12),
         ],
+
+        // ── V2.5: Human-Confirmed CRM Lead Creation ───────────────
+        // The AI only ever PREPARES a proposal. The lead is written by
+        // the existing V1 LeadService/OrganizationService, and only
+        // after an explicit human confirmation on the review page (with
+        // a fresh CRM duplicate re-check). See docs/MARKET_INTELLIGENCE.md.
+        'lead_creation' => [
+            'policy_version' => env('MI_LEAD_PROPOSAL_VERSION', 'v2.5-default-1'),
+            // How long a prepared proposal stays confirmable, in hours.
+            'proposal_ttl_hours' => 48,
+            // Per-user proposal preparations allowed per rolling hour.
+            'max_proposals_per_hour' => env('MARKET_INTELLIGENCE_MAX_PROPOSALS_PER_HOUR', 20),
+            // The `source` recorded on the created Organization + Lead.
+            'default_lead_source' => 'Market Intelligence',
+        ],
     ],
 
 ];
