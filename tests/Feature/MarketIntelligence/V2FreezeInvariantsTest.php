@@ -58,7 +58,7 @@ class V2FreezeInvariantsTest extends TestCase
             'get_customer_revenue_summary', 'get_customer_engagement_summary',
             'get_revenue_concentration', 'compare_account_period', 'identify_revenue_exceptions',
             // performance
-            'get_my_performance', 'get_team_performance',
+            'get_my_performance', 'get_team_performance', 'get_fiscal_performance',
         ] as $forbidden) {
             $this->assertNull($tools->find($forbidden), "MI agent must not have {$forbidden}.");
         }
