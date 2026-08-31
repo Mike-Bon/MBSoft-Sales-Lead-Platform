@@ -10,6 +10,7 @@ use App\Models\Opportunity;
 use App\Models\Target;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\Money;
 use App\Support\PerformanceSnapshot;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -244,7 +245,7 @@ class PerformanceService
 
     private function snapshotFor(Builder $opportunities, ?Target $target, Carbon $periodStart, Carbon $periodEnd): PerformanceSnapshot
     {
-        $currency = $target->currency ?? 'USD';
+        $currency = $target->currency ?? Money::defaultCurrency();
 
         $actual = $this->actualSales($opportunities, $periodStart, $periodEnd, $currency);
         $pipeline = $this->openPipeline($opportunities, $currency);

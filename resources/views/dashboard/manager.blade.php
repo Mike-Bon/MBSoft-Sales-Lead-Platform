@@ -61,15 +61,16 @@
             <flux:table.rows>
                 @forelse ($teams as $row)
                     @php($snapshot = $row['snapshot'])
+                    @php($money = fn ($value) => \App\Support\Money::format($value, $snapshot->currency, 0))
                     <flux:table.row>
                         <flux:table.cell>
                             <a class="underline" href="{{ route('performance.teams.show', $row['team']) }}" wire:navigate>{{ $row['team']->name }}</a>
                         </flux:table.cell>
-                        <flux:table.cell>{{ $snapshot->hasTarget ? $snapshot->currency.' '.number_format($snapshot->target, 0) : '—' }}</flux:table.cell>
-                        <flux:table.cell>{{ $snapshot->currency }} {{ number_format($snapshot->actual, 0) }}</flux:table.cell>
+                        <flux:table.cell>{{ $snapshot->hasTarget ? $money($snapshot->target) : '—' }}</flux:table.cell>
+                        <flux:table.cell>{{ $money($snapshot->actual) }}</flux:table.cell>
                         <flux:table.cell>{{ $snapshot->achievementPercent !== null ? number_format($snapshot->achievementPercent, 1).'%' : '—' }}</flux:table.cell>
-                        <flux:table.cell>{{ $snapshot->hasTarget ? ($snapshot->gap < 0 ? '+' : '').$snapshot->currency.' '.number_format(abs($snapshot->gap), 0) : '—' }}</flux:table.cell>
-                        <flux:table.cell>{{ $snapshot->currency }} {{ number_format($snapshot->pipeline, 0) }}</flux:table.cell>
+                        <flux:table.cell>{{ $snapshot->hasTarget ? ($snapshot->gap < 0 ? '+' : '').$money(abs($snapshot->gap)) : '—' }}</flux:table.cell>
+                        <flux:table.cell>{{ $money($snapshot->pipeline) }}</flux:table.cell>
                         <flux:table.cell>{{ $snapshot->pipelineCoverage !== null ? number_format($snapshot->pipelineCoverage, 2).'×' : '—' }}</flux:table.cell>
                         <flux:table.cell><x-performance.signal-badge :signal="$snapshot->managementSignal()" /></flux:table.cell>
                     </flux:table.row>
@@ -87,7 +88,7 @@
                     :items="collect($trend)->map(fn ($point) => [
                         'label' => $point['target']->period_start->format('M Y'),
                         'value' => $point['snapshot']->actual,
-                        'formatted' => $point['snapshot']->currency.' '.number_format($point['snapshot']->actual, 0).' ('.($point['snapshot']->achievementPercent !== null ? number_format($point['snapshot']->achievementPercent, 0).'%' : '—').')',
+                        'formatted' => \App\Support\Money::format($point['snapshot']->actual, $point['snapshot']->currency, 0).' ('.($point['snapshot']->achievementPercent !== null ? number_format($point['snapshot']->achievementPercent, 0).'%' : '—').')',
                     ])"
                 />
             @else

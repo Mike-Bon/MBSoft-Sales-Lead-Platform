@@ -377,7 +377,8 @@ needed for that.
 3. **Currency handling excludes, never mixes** — an organization with
    closed deals in multiple currencies will show revenue for only the
    selected currency at a time; the summary/top-accounts views default
-   to `COST_TO_SERVE_DEFAULT_CURRENCY` (USD).
+   to `COST_TO_SERVE_DEFAULT_CURRENCY`, which itself falls back to the
+   application default `config('app.currency')` — `PHP`.
 4. **No scheduled Cost-to-Serve workflow** — unlike Phases 6-8's three
    proactive review workflows, this phase does not add one; not asked
    for in the spec, and adding one would be scope beyond "build the

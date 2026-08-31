@@ -71,7 +71,7 @@
             </div>
             <div>
                 <div class="text-sm text-zinc-500 dark:text-zinc-400">Estimated Value</div>
-                <div>{{ $lead->estimated_value !== null ? $lead->currency.' '.number_format((float) $lead->estimated_value, 2) : '—' }}</div>
+                <div>{{ $lead->estimated_value !== null ? \App\Support\Money::format((float) $lead->estimated_value, $lead->currency, 2) : '—' }}</div>
             </div>
             <div>
                 <div class="text-sm text-zinc-500 dark:text-zinc-400">Expected Close</div>
@@ -111,7 +111,7 @@
                             <flux:table.row>
                                 <flux:table.cell><a class="underline" href="{{ route('crm.opportunities.show', $opportunity) }}" wire:navigate>{{ $opportunity->name }}</a></flux:table.cell>
                                 <flux:table.cell>{{ $opportunity->stage->label() }}</flux:table.cell>
-                                <flux:table.cell>{{ $opportunity->value !== null ? $opportunity->currency.' '.number_format((float) $opportunity->value, 2) : '—' }}</flux:table.cell>
+                                <flux:table.cell>{{ $opportunity->value !== null ? \App\Support\Money::format((float) $opportunity->value, $opportunity->currency, 2) : '—' }}</flux:table.cell>
                             </flux:table.row>
                         @endforeach
                     </flux:table.rows>

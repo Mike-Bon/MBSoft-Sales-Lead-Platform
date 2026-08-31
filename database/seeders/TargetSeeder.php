@@ -67,7 +67,7 @@ class TargetSeeder extends Seeder
             [
                 'period_type' => TargetPeriodType::Monthly->value,
                 'target_amount' => $amount,
-                'currency' => 'USD',
+                'currency' => 'PHP',
                 'status' => TargetStatus::Active->value,
             ],
         );

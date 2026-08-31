@@ -34,7 +34,7 @@
 
 <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
     <flux:input name="estimated_value" label="Estimated value" type="number" step="0.01" min="0" value="{{ old('estimated_value', $l?->estimated_value) }}" />
-    <flux:input name="currency" label="Currency" value="{{ old('currency', $l?->currency ?? 'USD') }}" maxlength="3" />
+    <flux:input name="currency" label="Currency" value="{{ old('currency', $l?->currency ?? \App\Support\Money::defaultCurrency()) }}" maxlength="3" />
     <flux:input name="expected_close_date" label="Expected close date" type="date" value="{{ old('expected_close_date', optional($l?->expected_close_date)->format('Y-m-d')) }}" />
 </div>
 

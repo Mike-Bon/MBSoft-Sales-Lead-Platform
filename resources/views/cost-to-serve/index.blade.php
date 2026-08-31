@@ -14,13 +14,13 @@
 
         <flux:heading size="lg" class="mb-2">Summary ({{ $currency }})</flux:heading>
         <div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <x-performance.kpi label="Total Revenue" :value="$currency.' '.number_format($summary['revenue'], 0)" />
+            <x-performance.kpi label="Total Revenue" :value="\App\Support\Money::format($summary['revenue'], $currency, 0)" />
             <x-performance.kpi label="Closed Deals" :value="(string) $summary['closed_deals_count']" />
             <x-performance.kpi
                 label="Avg Revenue / Closed Deal"
                 :undefined="$summary['average_revenue_per_deal'] === null"
                 undefined-label="No closed deals"
-                :value="$summary['average_revenue_per_deal'] !== null ? $currency.' '.number_format($summary['average_revenue_per_deal'], 0) : null"
+                :value="$summary['average_revenue_per_deal'] !== null ? \App\Support\Money::format($summary['average_revenue_per_deal'], $currency, 0) : null"
             />
             <x-performance.kpi label="Accounts to Review" :value="(string) count($exceptions)" />
         </div>
@@ -40,9 +40,9 @@
                         <flux:table.cell>
                             <a class="underline" href="{{ route('crm.organizations.show', $account->organizationId) }}" wire:navigate>{{ $account->organizationName }}</a>
                         </flux:table.cell>
-                        <flux:table.cell>{{ $currency }} {{ number_format($account->revenue, 0) }}</flux:table.cell>
+                        <flux:table.cell>{{ \App\Support\Money::format($account->revenue, $currency, 0) }}</flux:table.cell>
                         <flux:table.cell>{{ $account->closedDealsCount }}</flux:table.cell>
-                        <flux:table.cell>{{ $account->averageRevenuePerDeal !== null ? $currency.' '.number_format($account->averageRevenuePerDeal, 0) : '—' }}</flux:table.cell>
+                        <flux:table.cell>{{ $account->averageRevenuePerDeal !== null ? \App\Support\Money::format($account->averageRevenuePerDeal, $currency, 0) : '—' }}</flux:table.cell>
                         <flux:table.cell>{{ $account->engagementCount() }}</flux:table.cell>
                     </flux:table.row>
                 @empty

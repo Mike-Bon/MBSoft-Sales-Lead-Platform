@@ -111,8 +111,10 @@ return [
     'cost_to_serve' => [
         // Which Opportunity currency to aggregate — mirrors
         // PerformanceService's own convention (STEP 8/Phase 4) of never
-        // summing mixed currencies.
-        'default_currency' => env('COST_TO_SERVE_DEFAULT_CURRENCY', 'USD'),
+        // summing mixed currencies. Defaults to the application's
+        // business currency (config('app.currency')); override only to
+        // aggregate a different single currency.
+        'default_currency' => env('COST_TO_SERVE_DEFAULT_CURRENCY', env('APP_DEFAULT_CURRENCY', 'PHP')),
         // An account's revenue this period vs. last period dropping by
         // at least this percentage is flagged for review.
         'revenue_decline_threshold_percent' => env('COST_TO_SERVE_REVENUE_DECLINE_THRESHOLD', 20.0),

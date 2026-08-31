@@ -73,7 +73,7 @@
             </div>
             <div>
                 <div class="text-sm text-zinc-500 dark:text-zinc-400">Value</div>
-                <div>{{ $opportunity->value !== null ? $opportunity->currency.' '.number_format((float) $opportunity->value, 2) : '—' }}</div>
+                <div>{{ $opportunity->value !== null ? \App\Support\Money::format((float) $opportunity->value, $opportunity->currency, 2) : '—' }}</div>
             </div>
             <div>
                 <div class="text-sm text-zinc-500 dark:text-zinc-400">Probability</div>

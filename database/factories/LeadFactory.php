@@ -28,7 +28,7 @@ class LeadFactory extends Factory
             'status' => LeadStatus::New,
             'priority' => LeadPriority::Medium,
             'estimated_value' => fake()->randomFloat(2, 500, 50000),
-            'currency' => 'USD',
+            'currency' => config('app.currency', 'PHP'),
             'expected_close_date' => fake()->dateTimeBetween('now', '+3 months'),
             'next_follow_up_at' => null,
             'description' => fake()->sentence(),

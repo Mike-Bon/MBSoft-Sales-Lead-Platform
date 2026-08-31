@@ -6,6 +6,7 @@ use App\Contracts\Ai\AgentTool;
 use App\Models\User;
 use App\Services\CostToServe\AccountEconomicsService;
 use App\Support\Ai\ToolDefinition;
+use App\Support\Money;
 use Illuminate\Support\Carbon;
 
 /**
@@ -44,7 +45,7 @@ class GetCustomerRevenueSummaryTool implements AgentTool
 
         $start = isset($arguments['period_start']) ? Carbon::parse($arguments['period_start']) : Carbon::now()->startOfMonth();
         $end = isset($arguments['period_end']) ? Carbon::parse($arguments['period_end']) : Carbon::now()->endOfMonth();
-        $currency = $arguments['currency'] ?? (string) config('services.cost_to_serve.default_currency', 'USD');
+        $currency = $arguments['currency'] ?? (string) config('services.cost_to_serve.default_currency', Money::defaultCurrency());
 
         $snapshot = $this->economics->snapshotForOrganization($actor, $organization, $start, $end, $currency);
 

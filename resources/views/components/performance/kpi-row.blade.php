@@ -7,16 +7,18 @@
 --}}
 @props(['snapshot'])
 
+@php($money = fn ($value) => \App\Support\Money::format($value, $snapshot->currency, 0))
+
 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
     <x-performance.kpi
         label="Target"
         :undefined="! $snapshot->hasTarget"
         undefined-label="No target assigned"
-        :value="$snapshot->currency.' '.number_format($snapshot->target, 0)"
+        :value="$money($snapshot->target)"
     />
     <x-performance.kpi
         label="Actual"
-        :value="$snapshot->currency.' '.number_format($snapshot->actual, 0)"
+        :value="$money($snapshot->actual)"
     />
     <x-performance.kpi
         label="Achievement"
@@ -28,11 +30,11 @@
     <x-performance.kpi
         label="Gap"
         :undefined="! $snapshot->hasTarget"
-        :value="($snapshot->gap < 0 ? '+' : '').$snapshot->currency.' '.number_format(abs($snapshot->gap), 0).($snapshot->isOverAchieved() ? ' over' : '')"
+        :value="($snapshot->gap < 0 ? '+' : '').$money(abs($snapshot->gap)).($snapshot->isOverAchieved() ? ' over' : '')"
     />
     <x-performance.kpi
         label="Open Pipeline"
-        :value="$snapshot->currency.' '.number_format($snapshot->pipeline, 0)"
+        :value="$money($snapshot->pipeline)"
     />
     <x-performance.kpi
         label="Pipeline Coverage"

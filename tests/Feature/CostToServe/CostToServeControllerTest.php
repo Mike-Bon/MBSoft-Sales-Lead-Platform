@@ -61,7 +61,7 @@ class CostToServeControllerTest extends TestCase
             'organization_id' => $organization->id,
             'stage' => OpportunityStage::ClosedWon,
             'value' => 424242,
-            'currency' => 'USD',
+            'currency' => 'PHP',
             'closed_at' => Carbon::now(),
         ]);
 
@@ -80,14 +80,17 @@ class CostToServeControllerTest extends TestCase
             'organization_id' => $organization->id,
             'stage' => OpportunityStage::ClosedWon,
             'value' => 12345,
-            'currency' => 'USD',
+            'currency' => 'PHP',
             'closed_at' => Carbon::now(),
         ]);
 
         $this->actingAs($manager)->get('/cost-to-serve')
             ->assertOk()
             ->assertSee('Acme Logistics')
-            ->assertSee('12,345');
+            ->assertSee('12,345')
+            // Money is presented in the application default currency (PHP,
+            // Philippine Peso) with the peso sign — never converted.
+            ->assertSee('₱12,345');
     }
 
     public function test_a_manager_sees_every_teams_accounts(): void
@@ -96,8 +99,8 @@ class CostToServeControllerTest extends TestCase
         $orgA = Organization::factory()->create(['name' => 'Alpha Account']);
         $orgB = Organization::factory()->create(['name' => 'Bravo Account']);
 
-        Opportunity::factory()->create(['organization_id' => $orgA->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 500, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
-        Opportunity::factory()->create(['organization_id' => $orgB->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 500, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
+        Opportunity::factory()->create(['organization_id' => $orgA->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 500, 'currency' => 'PHP', 'closed_at' => Carbon::now()]);
+        Opportunity::factory()->create(['organization_id' => $orgB->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 500, 'currency' => 'PHP', 'closed_at' => Carbon::now()]);
 
         $this->actingAs($manager)->get('/cost-to-serve')
             ->assertOk()

@@ -24,7 +24,13 @@ class Target extends Model
      */
     protected $attributes = [
         'status' => 'active',
-        'currency' => 'USD',
+        // The application default business currency. Kept in sync with
+        // config('app.currency') (default PHP); the property form can't
+        // call config(), and TargetService always resolves the real
+        // value from the validated request anyway. The database column
+        // default (schema-level 'USD') is unreachable through the app
+        // because currency is a required request field.
+        'currency' => 'PHP',
     ];
 
     /**

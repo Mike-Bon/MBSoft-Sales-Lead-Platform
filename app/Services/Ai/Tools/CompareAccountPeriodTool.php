@@ -6,6 +6,7 @@ use App\Contracts\Ai\AgentTool;
 use App\Models\User;
 use App\Services\CostToServe\AccountEconomicsService;
 use App\Support\Ai\ToolDefinition;
+use App\Support\Money;
 use Illuminate\Support\Carbon;
 
 /**
@@ -57,7 +58,7 @@ class CompareAccountPeriodTool implements AgentTool
             $previousStart = $previousEnd->copy()->subDays($lengthInDays);
         }
 
-        $currency = $arguments['currency'] ?? (string) config('services.cost_to_serve.default_currency', 'USD');
+        $currency = $arguments['currency'] ?? (string) config('services.cost_to_serve.default_currency', Money::defaultCurrency());
 
         $comparison = $this->economics->comparePeriods($actor, $organization, $currentStart, $currentEnd, $previousStart, $previousEnd, $currency);
 

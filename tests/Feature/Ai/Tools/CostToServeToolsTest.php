@@ -38,7 +38,7 @@ class CostToServeToolsTest extends TestCase
             'organization_id' => $organization->id,
             'stage' => OpportunityStage::ClosedWon,
             'value' => 5000,
-            'currency' => 'USD',
+            'currency' => 'PHP',
             'closed_at' => Carbon::now(),
         ]);
 
@@ -79,8 +79,8 @@ class CostToServeToolsTest extends TestCase
         $manager = User::factory()->manager()->create();
         $a = Organization::factory()->create();
         $b = Organization::factory()->create();
-        Opportunity::factory()->create(['organization_id' => $a->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 1000, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
-        Opportunity::factory()->create(['organization_id' => $b->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 9000, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
+        Opportunity::factory()->create(['organization_id' => $a->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 1000, 'currency' => 'PHP', 'closed_at' => Carbon::now()]);
+        Opportunity::factory()->create(['organization_id' => $b->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 9000, 'currency' => 'PHP', 'closed_at' => Carbon::now()]);
 
         $result = app(GetRevenueConcentrationTool::class)->execute($manager, []);
 
@@ -95,7 +95,7 @@ class CostToServeToolsTest extends TestCase
 
         foreach (range(1, 5) as $i) {
             $org = Organization::factory()->create();
-            Opportunity::factory()->create(['organization_id' => $org->id, 'stage' => OpportunityStage::ClosedWon, 'value' => $i * 100, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
+            Opportunity::factory()->create(['organization_id' => $org->id, 'stage' => OpportunityStage::ClosedWon, 'value' => $i * 100, 'currency' => 'PHP', 'closed_at' => Carbon::now()]);
         }
 
         $result = app(GetRevenueConcentrationTool::class)->execute($manager, ['limit' => 100]);
@@ -108,7 +108,7 @@ class CostToServeToolsTest extends TestCase
         $ownTeam = Team::factory()->create();
         $head = User::factory()->teamHead($ownTeam)->create();
         $ownOrg = Organization::factory()->create(['team_id' => $ownTeam->id, 'name' => 'Own Team Account']);
-        Opportunity::factory()->create(['organization_id' => $ownOrg->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 100, 'currency' => 'USD', 'closed_at' => Carbon::now()]);
+        Opportunity::factory()->create(['organization_id' => $ownOrg->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 100, 'currency' => 'PHP', 'closed_at' => Carbon::now()]);
 
         // Phase 12A: a Team Head has no Cost-to-Serve access at all —
         // not even to their own team's own account, and not even with
@@ -175,8 +175,8 @@ class CostToServeToolsTest extends TestCase
         $manager = User::factory()->manager()->create();
         $organization = Organization::factory()->create();
 
-        Opportunity::factory()->create(['organization_id' => $organization->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 1000, 'currency' => 'USD', 'closed_at' => Carbon::parse('2026-05-15')]);
-        Opportunity::factory()->create(['organization_id' => $organization->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 100, 'currency' => 'USD', 'closed_at' => Carbon::parse('2026-06-15')]);
+        Opportunity::factory()->create(['organization_id' => $organization->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 1000, 'currency' => 'PHP', 'closed_at' => Carbon::parse('2026-05-15')]);
+        Opportunity::factory()->create(['organization_id' => $organization->id, 'stage' => OpportunityStage::ClosedWon, 'value' => 100, 'currency' => 'PHP', 'closed_at' => Carbon::parse('2026-06-15')]);
 
         $result = app(IdentifyRevenueExceptionsTool::class)->execute($manager, [
             'period_start' => '2026-06-01',

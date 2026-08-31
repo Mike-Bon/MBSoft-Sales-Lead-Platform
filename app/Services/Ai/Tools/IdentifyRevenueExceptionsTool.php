@@ -6,6 +6,7 @@ use App\Contracts\Ai\AgentTool;
 use App\Models\User;
 use App\Services\CostToServe\AccountEconomicsService;
 use App\Support\Ai\ToolDefinition;
+use App\Support\Money;
 use Illuminate\Support\Carbon;
 
 /**
@@ -54,7 +55,7 @@ class IdentifyRevenueExceptionsTool implements AgentTool
             $previousStart = $previousEnd->copy()->subDays($lengthInDays);
         }
 
-        $currency = $arguments['currency'] ?? (string) config('services.cost_to_serve.default_currency', 'USD');
+        $currency = $arguments['currency'] ?? (string) config('services.cost_to_serve.default_currency', Money::defaultCurrency());
         $maxAccounts = (int) config('services.cost_to_serve.max_accounts_per_query', 20);
         $limit = min((int) ($arguments['limit'] ?? $maxAccounts), $maxAccounts);
 

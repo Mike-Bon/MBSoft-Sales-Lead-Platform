@@ -33,7 +33,7 @@
                             </a>
                         </flux:table.cell>
                         <flux:table.cell>{{ $target->period_start->format('M j, Y') }} – {{ $target->period_end->format('M j, Y') }}</flux:table.cell>
-                        <flux:table.cell>{{ $target->currency }} {{ number_format((float) $target->target_amount, 2) }}</flux:table.cell>
+                        <flux:table.cell>{{ \App\Support\Money::format((float) $target->target_amount, $target->currency, 2) }}</flux:table.cell>
                         <flux:table.cell><flux:badge size="sm">{{ $target->status->label() }}</flux:badge></flux:table.cell>
                     </flux:table.row>
                 @empty

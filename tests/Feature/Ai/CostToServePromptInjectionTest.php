@@ -65,7 +65,7 @@ class CostToServePromptInjectionTest extends TestCase
             'organization_id' => $restricted->id,
             'stage' => OpportunityStage::ClosedWon,
             'value' => 999999,
-            'currency' => 'USD',
+            'currency' => 'PHP',
             'closed_at' => Carbon::now(),
         ]);
 

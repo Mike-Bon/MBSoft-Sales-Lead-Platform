@@ -31,13 +31,14 @@
                 <flux:table.rows>
                     @foreach ($teams as $row)
                         @php($snapshot = $row['snapshot'])
+                        @php($money = fn ($value) => \App\Support\Money::format($value, $snapshot->currency, 2))
                         <flux:table.row>
                             <flux:table.cell>{{ $row['team']->name }}</flux:table.cell>
-                            <flux:table.cell>{{ $snapshot->hasTarget ? $snapshot->currency.' '.number_format($snapshot->target, 2) : '—' }}</flux:table.cell>
-                            <flux:table.cell>{{ $snapshot->currency }} {{ number_format($snapshot->actual, 2) }}</flux:table.cell>
+                            <flux:table.cell>{{ $snapshot->hasTarget ? $money($snapshot->target) : '—' }}</flux:table.cell>
+                            <flux:table.cell>{{ $money($snapshot->actual) }}</flux:table.cell>
                             <flux:table.cell>{{ $snapshot->achievementPercent !== null ? number_format($snapshot->achievementPercent, 1).'%' : '—' }}</flux:table.cell>
-                            <flux:table.cell>{{ $snapshot->hasTarget ? ($snapshot->gap < 0 ? '+' : '').$snapshot->currency.' '.number_format(abs($snapshot->gap), 2) : '—' }}</flux:table.cell>
-                            <flux:table.cell>{{ $snapshot->currency }} {{ number_format($snapshot->pipeline, 2) }}</flux:table.cell>
+                            <flux:table.cell>{{ $snapshot->hasTarget ? ($snapshot->gap < 0 ? '+' : '').$money(abs($snapshot->gap)) : '—' }}</flux:table.cell>
+                            <flux:table.cell>{{ $money($snapshot->pipeline) }}</flux:table.cell>
                             <flux:table.cell>{{ $snapshot->pipelineCoverage !== null ? number_format($snapshot->pipelineCoverage, 2).'×' : '—' }}</flux:table.cell>
                         </flux:table.row>
                     @endforeach

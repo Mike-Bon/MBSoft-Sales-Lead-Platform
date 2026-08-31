@@ -2,14 +2,15 @@
      show page and the performance verification pages so there is a
      single place the numbers are displayed, matching the single place
      (PerformanceService) they are calculated. --}}
+@php($money = fn ($value) => \App\Support\Money::format($value, $snapshot->currency, 2))
 <div class="grid grid-cols-2 gap-6 sm:grid-cols-4">
     <div>
         <div class="text-sm text-zinc-500 dark:text-zinc-400">Target</div>
-        <div class="text-lg font-semibold">{{ $snapshot->hasTarget ? $snapshot->currency.' '.number_format($snapshot->target, 2) : 'No target set' }}</div>
+        <div class="text-lg font-semibold">{{ $snapshot->hasTarget ? $money($snapshot->target) : 'No target set' }}</div>
     </div>
     <div>
         <div class="text-sm text-zinc-500 dark:text-zinc-400">Actual</div>
-        <div class="text-lg font-semibold">{{ $snapshot->currency }} {{ number_format($snapshot->actual, 2) }}</div>
+        <div class="text-lg font-semibold">{{ $money($snapshot->actual) }}</div>
     </div>
     <div>
         <div class="text-sm text-zinc-500 dark:text-zinc-400">Achievement</div>
@@ -21,19 +22,19 @@
             @if (! $snapshot->hasTarget)
                 —
             @elseif ($snapshot->gap < 0)
-                +{{ $snapshot->currency }} {{ number_format(abs($snapshot->gap), 2) }} over
+                +{{ $money(abs($snapshot->gap)) }} over
             @else
-                {{ $snapshot->currency }} {{ number_format($snapshot->gap, 2) }}
+                {{ $money($snapshot->gap) }}
             @endif
         </div>
     </div>
     <div>
         <div class="text-sm text-zinc-500 dark:text-zinc-400">Remaining Target</div>
-        <div class="text-lg font-semibold">{{ $snapshot->hasTarget ? $snapshot->currency.' '.number_format($snapshot->remainingTarget, 2) : '—' }}</div>
+        <div class="text-lg font-semibold">{{ $snapshot->hasTarget ? $money($snapshot->remainingTarget) : '—' }}</div>
     </div>
     <div>
         <div class="text-sm text-zinc-500 dark:text-zinc-400">Open Pipeline</div>
-        <div class="text-lg font-semibold">{{ $snapshot->currency }} {{ number_format($snapshot->pipeline, 2) }}</div>
+        <div class="text-lg font-semibold">{{ $money($snapshot->pipeline) }}</div>
     </div>
     <div>
         <div class="text-sm text-zinc-500 dark:text-zinc-400">Pipeline Coverage</div>
@@ -53,11 +54,11 @@
     </div>
     <div>
         <div class="text-sm text-zinc-500 dark:text-zinc-400">Run Rate / day</div>
-        <div class="text-lg font-semibold">{{ $snapshot->runRate !== null ? $snapshot->currency.' '.number_format($snapshot->runRate, 2) : 'N/A' }}</div>
+        <div class="text-lg font-semibold">{{ $snapshot->runRate !== null ? $money($snapshot->runRate) : 'N/A' }}</div>
     </div>
     <div>
         <div class="text-sm text-zinc-500 dark:text-zinc-400">Required Run Rate / day</div>
-        <div class="text-lg font-semibold">{{ $snapshot->requiredRunRate !== null ? $snapshot->currency.' '.number_format($snapshot->requiredRunRate, 2) : 'N/A' }}</div>
+        <div class="text-lg font-semibold">{{ $snapshot->requiredRunRate !== null ? $money($snapshot->requiredRunRate) : 'N/A' }}</div>
     </div>
 </div>
 <div class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\CostToServe\AccountEconomicsService;
 use App\Services\CostToServe\CostToServeAccessService;
+use App\Support\Money;
 use App\Support\PeriodSelection;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -40,7 +41,7 @@ class CostToServeController extends Controller
         }
 
         $period = PeriodSelection::fromRequest($request);
-        $currency = (string) config('services.cost_to_serve.default_currency', 'USD');
+        $currency = (string) config('services.cost_to_serve.default_currency', Money::defaultCurrency());
         $maxAccounts = (int) config('services.cost_to_serve.max_accounts_per_query', 20);
 
         $lengthInDays = $period->start->diffInDays($period->end);

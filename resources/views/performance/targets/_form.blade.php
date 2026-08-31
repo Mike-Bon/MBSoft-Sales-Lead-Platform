@@ -37,7 +37,7 @@
 
 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
     <flux:input name="target_amount" label="Target amount" type="number" step="0.01" min="0" value="{{ old('target_amount', $t?->target_amount) }}" required />
-    <flux:input name="currency" label="Currency" value="{{ old('currency', $t?->currency ?? 'USD') }}" maxlength="3" required />
+    <flux:input name="currency" label="Currency" value="{{ old('currency', $t?->currency ?? \App\Support\Money::defaultCurrency()) }}" maxlength="3" required />
 </div>
 
 @if ($t)

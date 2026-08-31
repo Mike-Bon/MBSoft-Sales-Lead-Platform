@@ -59,7 +59,8 @@ a stricter variant without changing this document's core definition.
 
 A target has exactly one `currency`. Actual and pipeline are only summed
 from opportunities whose `currency` matches the target's (or, for a
-period-based calculation with no target record, `USD` is assumed). There
+period-based calculation with no target record, the application default
+`config('app.currency')` — `PHP` — is assumed). There
 is no currency conversion in this phase — an opportunity in a different
 currency, or with no currency set, is simply excluded from that
 calculation rather than being incorrectly added to the total. This is a

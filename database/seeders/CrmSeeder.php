@@ -109,7 +109,7 @@ class CrmSeeder extends Seeder
             [
                 'owner_id' => $head1->id, 'team_id' => $team1->id, 'source' => 'Referral',
                 'status' => LeadStatus::Contacted, 'priority' => LeadPriority::High,
-                'estimated_value' => 42000, 'currency' => 'USD',
+                'estimated_value' => 42000, 'currency' => 'PHP',
                 'next_follow_up_at' => now()->subDays(3), 'description' => 'Fleet tracking upgrade for 40 vehicles.',
             ],
         );
@@ -119,7 +119,7 @@ class CrmSeeder extends Seeder
             [
                 'owner_id' => $member1->id, 'team_id' => $team1->id, 'source' => 'Trade Show',
                 'status' => LeadStatus::Qualified, 'priority' => LeadPriority::Medium,
-                'estimated_value' => 18500, 'currency' => 'USD',
+                'estimated_value' => 18500, 'currency' => 'PHP',
                 'next_follow_up_at' => now()->setTime(17, 0), 'description' => 'Automation line assessment.',
             ],
         );
@@ -129,7 +129,7 @@ class CrmSeeder extends Seeder
             [
                 'owner_id' => $head2->id, 'team_id' => $team2->id, 'source' => 'Website',
                 'status' => LeadStatus::New, 'priority' => LeadPriority::Medium,
-                'estimated_value' => 9500, 'currency' => 'USD',
+                'estimated_value' => 9500, 'currency' => 'PHP',
                 'next_follow_up_at' => now()->addWeek(), 'description' => 'POS system refresh across 12 stores.',
             ],
         );
@@ -139,7 +139,7 @@ class CrmSeeder extends Seeder
             [
                 'owner_id' => $member2->id, 'team_id' => $team2->id, 'source' => 'Cold Outreach',
                 'status' => LeadStatus::New, 'priority' => LeadPriority::Low,
-                'estimated_value' => 6000, 'currency' => 'USD',
+                'estimated_value' => 6000, 'currency' => 'PHP',
                 'description' => 'Scheduling software inquiry.',
             ],
         );
@@ -159,7 +159,7 @@ class CrmSeeder extends Seeder
             [
                 'organization_id' => $acme->id, 'contact_id' => $contactAcme->id, 'lead_id' => $leadOverdue->id,
                 'owner_id' => $head1->id, 'team_id' => $team1->id,
-                'stage' => OpportunityStage::Negotiation, 'value' => 42000, 'currency' => 'USD', 'probability' => 75,
+                'stage' => OpportunityStage::Negotiation, 'value' => 42000, 'currency' => 'PHP', 'probability' => 75,
                 'expected_close_date' => now()->addDays(10),
             ],
         );
@@ -169,7 +169,7 @@ class CrmSeeder extends Seeder
             [
                 'organization_id' => $borealis->id, 'contact_id' => $contactBorealis->id, 'lead_id' => $leadDueToday->id,
                 'owner_id' => $member1->id, 'team_id' => $team1->id,
-                'stage' => OpportunityStage::Proposal, 'value' => 18500, 'currency' => 'USD', 'probability' => 50,
+                'stage' => OpportunityStage::Proposal, 'value' => 18500, 'currency' => 'PHP', 'probability' => 50,
                 'expected_close_date' => now()->addDays(21),
             ],
         );
@@ -179,7 +179,7 @@ class CrmSeeder extends Seeder
             [
                 'organization_id' => $cascade->id, 'contact_id' => $contactCascade->id,
                 'owner_id' => $head2->id, 'team_id' => $team2->id,
-                'stage' => OpportunityStage::ClosedWon, 'value' => 31000, 'currency' => 'USD', 'probability' => 100,
+                'stage' => OpportunityStage::ClosedWon, 'value' => 31000, 'currency' => 'PHP', 'probability' => 100,
                 'expected_close_date' => now()->subDays(5),
                 // Set explicitly: this opportunity is created directly
                 // into a closed stage (not via OpportunityService, which
@@ -196,7 +196,7 @@ class CrmSeeder extends Seeder
             [
                 'organization_id' => $driftwood->id, 'contact_id' => $contactDriftwood->id,
                 'owner_id' => $member2->id, 'team_id' => $team2->id,
-                'stage' => OpportunityStage::ClosedLost, 'value' => 6000, 'currency' => 'USD', 'probability' => 0,
+                'stage' => OpportunityStage::ClosedLost, 'value' => 6000, 'currency' => 'PHP', 'probability' => 0,
                 'expected_close_date' => now()->subDays(2),
                 'closed_at' => now()->subDays(2),
             ],

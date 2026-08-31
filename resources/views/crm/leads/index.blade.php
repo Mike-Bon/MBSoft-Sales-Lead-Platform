@@ -81,7 +81,7 @@
                         <flux:table.cell>{{ $lead->priority->label() }}</flux:table.cell>
                         <flux:table.cell>{{ $lead->owner?->name ?? '—' }}</flux:table.cell>
                         <flux:table.cell>{{ $lead->team?->name ?? '—' }}</flux:table.cell>
-                        <flux:table.cell>{{ $lead->estimated_value !== null ? $lead->currency.' '.number_format((float) $lead->estimated_value, 2) : '—' }}</flux:table.cell>
+                        <flux:table.cell>{{ $lead->estimated_value !== null ? \App\Support\Money::format((float) $lead->estimated_value, $lead->currency, 2) : '—' }}</flux:table.cell>
                         <flux:table.cell><flux:badge size="sm" :color="$followUpBadge($lead)">{{ $lead->followUpStatus()->label() }}</flux:badge></flux:table.cell>
                     </flux:table.row>
                 @empty

@@ -53,15 +53,16 @@
     <flux:table.rows>
         @forelse ($members as $row)
             @php($memberSnapshot = $row['snapshot'])
+            @php($money = fn ($value) => \App\Support\Money::format($value, $memberSnapshot->currency, 0))
             <flux:table.row>
                 <flux:table.cell>
                     <a class="underline" href="{{ route('performance.individual', $row['user']) }}" wire:navigate>{{ $row['user']->name }}</a>
                 </flux:table.cell>
-                <flux:table.cell>{{ $memberSnapshot->hasTarget ? $memberSnapshot->currency.' '.number_format($memberSnapshot->target, 0) : '—' }}</flux:table.cell>
-                <flux:table.cell>{{ $memberSnapshot->currency }} {{ number_format($memberSnapshot->actual, 0) }}</flux:table.cell>
+                <flux:table.cell>{{ $memberSnapshot->hasTarget ? $money($memberSnapshot->target) : '—' }}</flux:table.cell>
+                <flux:table.cell>{{ $money($memberSnapshot->actual) }}</flux:table.cell>
                 <flux:table.cell>{{ $memberSnapshot->achievementPercent !== null ? number_format($memberSnapshot->achievementPercent, 1).'%' : '—' }}</flux:table.cell>
-                <flux:table.cell>{{ $memberSnapshot->hasTarget ? ($memberSnapshot->gap < 0 ? '+' : '').$memberSnapshot->currency.' '.number_format(abs($memberSnapshot->gap), 0) : '—' }}</flux:table.cell>
-                <flux:table.cell>{{ $memberSnapshot->currency }} {{ number_format($memberSnapshot->pipeline, 0) }}</flux:table.cell>
+                <flux:table.cell>{{ $memberSnapshot->hasTarget ? ($memberSnapshot->gap < 0 ? '+' : '').$money(abs($memberSnapshot->gap)) : '—' }}</flux:table.cell>
+                <flux:table.cell>{{ $money($memberSnapshot->pipeline) }}</flux:table.cell>
                 <flux:table.cell><x-performance.signal-badge :signal="$memberSnapshot->managementSignal()" /></flux:table.cell>
             </flux:table.row>
         @empty

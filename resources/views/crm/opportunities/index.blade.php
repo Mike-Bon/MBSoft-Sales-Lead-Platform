@@ -60,7 +60,7 @@
                         <flux:table.cell><flux:badge size="sm" :color="$stageColor($opportunity->stage)">{{ $opportunity->stage->label() }}</flux:badge></flux:table.cell>
                         <flux:table.cell>{{ $opportunity->owner?->name ?? '—' }}</flux:table.cell>
                         <flux:table.cell>{{ $opportunity->team?->name ?? '—' }}</flux:table.cell>
-                        <flux:table.cell>{{ $opportunity->value !== null ? $opportunity->currency.' '.number_format((float) $opportunity->value, 2) : '—' }}</flux:table.cell>
+                        <flux:table.cell>{{ $opportunity->value !== null ? \App\Support\Money::format((float) $opportunity->value, $opportunity->currency, 2) : '—' }}</flux:table.cell>
                         <flux:table.cell>{{ $opportunity->probability !== null ? $opportunity->probability.'%' : '—' }}</flux:table.cell>
                         <flux:table.cell>{{ optional($opportunity->expected_close_date)->format('M j, Y') ?? '—' }}</flux:table.cell>
                     </flux:table.row>

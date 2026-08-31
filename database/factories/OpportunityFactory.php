@@ -27,7 +27,7 @@ class OpportunityFactory extends Factory
             'name' => fake()->catchPhrase(),
             'stage' => OpportunityStage::Qualification,
             'value' => fake()->randomFloat(2, 1000, 100000),
-            'currency' => 'USD',
+            'currency' => config('app.currency', 'PHP'),
             'probability' => 20,
             'expected_close_date' => fake()->dateTimeBetween('now', '+3 months'),
             'description' => fake()->sentence(),

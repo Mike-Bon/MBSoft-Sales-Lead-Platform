@@ -69,6 +69,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Default Business Currency
+    |--------------------------------------------------------------------------
+    |
+    | The single authoritative currency for money the application creates
+    | or displays without an explicit per-record currency: new leads,
+    | opportunities and targets, the Cost-to-Serve aggregation currency,
+    | and the user-facing money formatter (App\Support\Money). This is a
+    | denomination/default/presentation setting only — it never converts
+    | or relabels an amount that already carries its own currency code.
+    |
+    */
+
+    'currency' => env('APP_DEFAULT_CURRENCY', 'PHP'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

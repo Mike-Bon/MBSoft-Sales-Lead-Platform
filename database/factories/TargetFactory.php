@@ -31,7 +31,7 @@ class TargetFactory extends Factory
             'period_start' => $start,
             'period_end' => $start->copy()->endOfMonth(),
             'target_amount' => 100000,
-            'currency' => 'USD',
+            'currency' => config('app.currency', 'PHP'),
             'status' => TargetStatus::Active,
             'notes' => null,
         ];

@@ -31,7 +31,7 @@
         ></div>
     </div>
     <div class="mt-1 flex justify-between text-xs text-zinc-500 dark:text-zinc-400">
-        <span>{{ $snapshot->currency }} {{ number_format($snapshot->actual, 0) }} actual</span>
-        <span>{{ $snapshot->hasTarget ? $snapshot->currency.' '.number_format($snapshot->target, 0).' target' : 'no target' }}</span>
+        <span>{{ \App\Support\Money::format($snapshot->actual, $snapshot->currency, 0) }} actual</span>
+        <span>{{ $snapshot->hasTarget ? \App\Support\Money::format($snapshot->target, $snapshot->currency, 0).' target' : 'no target' }}</span>
     </div>
 </div>
