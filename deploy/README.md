@@ -32,7 +32,7 @@ migration, caches views/events, sets permissions, and can create the
 first Manager account.
 
 The AI assistant defaults to `LLM_PROVIDER=gemini` /
-`LLM_MODEL=gemini-2.5-flash`; set `LLM_PROVIDER=anthropic` +
+`LLM_MODEL=gemini-3.6-flash`; set `LLM_PROVIDER=anthropic` +
 `LLM_MODEL=claude-...` in `.env` to use the Anthropic fallback instead.
 Gemini is only the reasoning model — external prospect discovery still
 uses Brave (`SEARCH_PROVIDER=brave`, `BRAVE_SEARCH_COUNTRY=PH`).

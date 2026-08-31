@@ -70,7 +70,7 @@ return [
     'llm' => [
         'provider' => env('LLM_PROVIDER', 'gemini'),
         'api_key' => env('LLM_API_KEY'),
-        'model' => env('LLM_MODEL', 'gemini-2.5-flash'),
+        'model' => env('LLM_MODEL', 'gemini-3.6-flash'),
         'max_tokens' => env('LLM_MAX_TOKENS', 1024),
         'timeout' => env('LLM_TIMEOUT_SECONDS', 30),
     ],

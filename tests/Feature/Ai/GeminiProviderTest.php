@@ -40,7 +40,7 @@ class GeminiProviderTest extends TestCase
         config([
             'services.llm.provider' => 'gemini',
             'services.llm.api_key' => 'test-key',
-            'services.llm.model' => 'gemini-2.5-flash',
+            'services.llm.model' => 'gemini-3.6-flash',
             'services.llm.max_tokens' => 512,
         ]);
     }
@@ -93,7 +93,7 @@ class GeminiProviderTest extends TestCase
         (new GeminiProvider)->complete('system', [['role' => 'user', 'content' => 'hi']], []);
 
         Http::assertSent(function ($request) {
-            return str_contains($request->url(), '/v1beta/models/gemini-2.5-flash:generateContent')
+            return str_contains($request->url(), '/v1beta/models/gemini-3.6-flash:generateContent')
                 && $request->hasHeader('x-goog-api-key', 'test-key')
                 && ! str_contains($request->url(), 'test-key')
                 && ! str_contains($request->url(), 'key=');
@@ -528,6 +528,293 @@ class GeminiProviderTest extends TestCase
     public function test_the_bound_provider_is_gemini_by_default(): void
     {
         $this->assertInstanceOf(GeminiProvider::class, app(LlmProvider::class));
+    }
+
+    // ─────────────  Gemini 3+ thought-signature round-trip  ──────────
+    //
+    // Gemini 3 rejects a continuation request (HTTP 400) unless the
+    // opaque thoughtSignature from each model turn's functionCall part
+    // is replayed verbatim on the same part. These tests inspect the
+    // ACTUAL outgoing continuation request bodies, not just the final
+    // AgentResponse.
+
+    private function signedFunctionCallCandidate(string $name, array $args, string $signature, ?string $id = null): array
+    {
+        $fc = ['name' => $name, 'args' => $args === [] ? new \stdClass : $args];
+        if ($id !== null) {
+            $fc['id'] = $id;
+        }
+
+        return ['candidates' => [['content' => ['role' => 'model', 'parts' => [
+            ['functionCall' => $fc, 'thoughtSignature' => $signature],
+        ]], 'finishReason' => 'STOP']]];
+    }
+
+    public function test_a_single_signed_function_call_is_replayed_with_its_signature_on_the_same_part(): void
+    {
+        Http::fake([
+            self::URL => Http::sequence()
+                ->push($this->signedFunctionCallCandidate('echo', ['value' => 'ping'], 'SIG-A'), 200)
+                ->push($this->textCandidate('pong'), 200),
+        ]);
+
+        $agent = new Agent(new GeminiProvider, new ToolRegistry([$this->echoTool()]), 'system prompt');
+        $agent->respond(User::factory()->create(), 'echo ping');
+
+        $secondRequest = Http::recorded()[1][0]->data();
+        $modelTurn = $secondRequest['contents'][1];
+
+        $this->assertSame('model', $modelTurn['role']);
+        $this->assertSame('echo', $modelTurn['parts'][0]['functionCall']['name']);
+        // The signature is a SIBLING of functionCall on the same part —
+        // not inside functionCall, not on another part, not fabricated.
+        $this->assertSame('SIG-A', $modelTurn['parts'][0]['thoughtSignature']);
+        $this->assertArrayNotHasKey('thoughtSignature', $modelTurn['parts'][0]['functionCall']);
+    }
+
+    public function test_parallel_calls_carry_the_signature_only_on_the_first_function_call_and_keep_order(): void
+    {
+        $this->fakeOnce($this->textCandidate('done'));
+
+        // The history Agent builds after Gemini returned two parallel
+        // calls where only the first carried a signature.
+        (new GeminiProvider)->complete('system', [
+            ['role' => 'user', 'content' => 'a and b'],
+            ['role' => 'assistant', 'content' => null, 'tool_calls' => [
+                new ToolCall('alpha#0', 'alpha', [], 'SIG-FIRST'),
+                new ToolCall('beta#1', 'beta', [], null),
+            ]],
+            ['role' => 'tool_result', 'tool_call_id' => 'alpha#0', 'content' => '{"r":"a"}', 'is_error' => false],
+            ['role' => 'tool_result', 'tool_call_id' => 'beta#1', 'content' => '{"r":"b"}', 'is_error' => false],
+        ], [
+            new ToolDefinition('alpha', 'x', ['type' => 'object', 'properties' => []]),
+            new ToolDefinition('beta', 'x', ['type' => 'object', 'properties' => []]),
+        ]);
+
+        $contents = Http::recorded()[0][0]->data()['contents'];
+        $modelParts = $contents[1]['parts'];
+
+        $this->assertCount(2, $modelParts);
+        $this->assertSame('alpha', $modelParts[0]['functionCall']['name']);
+        $this->assertSame('SIG-FIRST', $modelParts[0]['thoughtSignature']);
+        $this->assertSame('beta', $modelParts[1]['functionCall']['name']);
+        $this->assertArrayNotHasKey('thoughtSignature', $modelParts[1]);
+
+        // Never transformed into FC1,FR1,FC2,FR2 — one model turn then
+        // one user turn with both responses in order.
+        $this->assertCount(3, $contents);
+        $this->assertSame('user', $contents[2]['role']);
+        $this->assertSame(['a', 'b'], [
+            $contents[2]['parts'][0]['functionResponse']['response']['r'],
+            $contents[2]['parts'][1]['functionResponse']['response']['r'],
+        ]);
+    }
+
+    public function test_parallel_same_function_calls_keep_their_signature_position_and_argument_order(): void
+    {
+        $this->fakeOnce($this->textCandidate('done'));
+
+        (new GeminiProvider)->complete('system', [
+            ['role' => 'user', 'content' => 'leads 1 and 2'],
+            ['role' => 'assistant', 'content' => null, 'tool_calls' => [
+                new ToolCall('get_lead#0', 'get_lead', ['id' => 1], 'SIG-ONLY-FIRST'),
+                new ToolCall('get_lead#1', 'get_lead', ['id' => 2], null),
+            ]],
+            ['role' => 'tool_result', 'tool_call_id' => 'get_lead#0', 'content' => '{"n":"A"}', 'is_error' => false],
+            ['role' => 'tool_result', 'tool_call_id' => 'get_lead#1', 'content' => '{"n":"B"}', 'is_error' => false],
+        ], [new ToolDefinition('get_lead', 'x', ['type' => 'object', 'properties' => []])]);
+
+        $modelParts = Http::recorded()[0][0]->data()['contents'][1]['parts'];
+
+        $this->assertSame(['id' => 1], $modelParts[0]['functionCall']['args']);
+        $this->assertSame('SIG-ONLY-FIRST', $modelParts[0]['thoughtSignature']);
+        $this->assertSame(['id' => 2], $modelParts[1]['functionCall']['args']);
+        $this->assertArrayNotHasKey('thoughtSignature', $modelParts[1]);
+    }
+
+    public function test_sequential_multi_step_calls_each_replay_their_own_signature_in_place(): void
+    {
+        Http::fake([
+            self::URL => Http::sequence()
+                ->push($this->signedFunctionCallCandidate('echo', ['value' => 'one'], 'SIG-A'), 200)
+                ->push($this->signedFunctionCallCandidate('echo', ['value' => 'two'], 'SIG-B'), 200)
+                ->push($this->textCandidate('Echoed one and two.'), 200),
+        ]);
+
+        $agent = new Agent(new GeminiProvider, new ToolRegistry([$this->echoTool()]), 'system prompt', maxToolIterations: 6);
+        $response = $agent->respond(User::factory()->create(), 'echo one then two');
+
+        $this->assertSame(AgentInteractionStatus::Completed, $response->status);
+        $recorded = Http::recorded();
+        $this->assertCount(3, $recorded);
+
+        // Request #2: only turn 1 exists → carries SIG-A.
+        $req2 = $recorded[1][0]->data()['contents'];
+        $this->assertSame('SIG-A', $req2[1]['parts'][0]['thoughtSignature']);
+        $this->assertSame('one', $req2[1]['parts'][0]['functionCall']['args']['value']);
+
+        // Request #3: turn 1 still carries SIG-A, turn 2 carries SIG-B.
+        $req3 = $recorded[2][0]->data()['contents'];
+        $this->assertSame('model', $req3[1]['role']);
+        $this->assertSame('SIG-A', $req3[1]['parts'][0]['thoughtSignature']);
+        $this->assertSame('one', $req3[1]['parts'][0]['functionCall']['args']['value']);
+        $this->assertSame('model', $req3[3]['role']);
+        $this->assertSame('SIG-B', $req3[3]['parts'][0]['thoughtSignature']);
+        $this->assertSame('two', $req3[3]['parts'][0]['functionCall']['args']['value']);
+
+        // Neither signature moved onto a functionResponse (user) part.
+        $this->assertArrayNotHasKey('thoughtSignature', $req3[2]['parts'][0]);
+        $this->assertArrayNotHasKey('thoughtSignature', $req3[4]['parts'][0]);
+        // SIG-B never leaked onto turn 1; SIG-A never onto turn 2.
+        $this->assertNotSame('SIG-B', $req3[1]['parts'][0]['thoughtSignature']);
+        $this->assertNotSame('SIG-A', $req3[3]['parts'][0]['thoughtSignature']);
+    }
+
+    public function test_text_plus_a_signed_function_call_preserves_the_function_call_signature(): void
+    {
+        Http::fake([
+            self::URL => Http::sequence()
+                ->push(['candidates' => [['content' => ['role' => 'model', 'parts' => [
+                    ['text' => 'Let me check.', 'thoughtSignature' => 'TEXT-SIG'],
+                    ['functionCall' => ['name' => 'echo', 'args' => ['value' => 'x']], 'thoughtSignature' => 'FC-SIG'],
+                ]], 'finishReason' => 'STOP']]], 200)
+                ->push($this->textCandidate('ok'), 200),
+        ]);
+
+        $agent = new Agent(new GeminiProvider, new ToolRegistry([$this->echoTool()]), 'system prompt');
+        $agent->respond(User::factory()->create(), 'go');
+
+        $modelParts = Http::recorded()[1][0]->data()['contents'][1]['parts'];
+
+        $this->assertSame('Let me check.', $modelParts[0]['text']);
+        $this->assertSame('echo', $modelParts[1]['functionCall']['name']);
+        $this->assertSame('FC-SIG', $modelParts[1]['thoughtSignature']);
+        // Known minor gap: the recommended-only text-part signature is
+        // not preserved — and never fabricated.
+        $this->assertArrayNotHasKey('thoughtSignature', $modelParts[0]);
+    }
+
+    public function test_a_gemini_provided_id_and_signature_are_both_preserved(): void
+    {
+        $this->fakeOnce($this->signedFunctionCallCandidate('get_lead', ['id' => 5], 'SIG-X', id: 'call_xyz'));
+
+        $result = (new GeminiProvider)->complete('system', [['role' => 'user', 'content' => 'lead 5']], [
+            new ToolDefinition('get_lead', 'x', ['type' => 'object', 'properties' => []]),
+        ]);
+
+        $this->assertSame('call_xyz', $result->toolCalls[0]->id);
+        $this->assertSame('SIG-X', $result->toolCalls[0]->providerSignature);
+
+        // And both survive the replay.
+        Http::fake([self::URL => Http::response($this->textCandidate('done'), 200)]);
+        (new GeminiProvider)->complete('system', [
+            ['role' => 'user', 'content' => 'lead 5'],
+            ['role' => 'assistant', 'content' => null, 'tool_calls' => $result->toolCalls],
+            ['role' => 'tool_result', 'tool_call_id' => 'call_xyz', 'content' => '{"n":"G"}', 'is_error' => false],
+        ], [new ToolDefinition('get_lead', 'x', ['type' => 'object', 'properties' => []])]);
+
+        $part = Http::recorded()->last()[0]->data()['contents'][1]['parts'][0];
+        $this->assertSame('call_xyz', $part['functionCall']['id']);
+        $this->assertSame('SIG-X', $part['thoughtSignature']);
+    }
+
+    public function test_a_synthesised_id_and_signature_are_both_preserved(): void
+    {
+        $this->fakeOnce($this->signedFunctionCallCandidate('echo', ['value' => 'v'], 'SIG-SYNTH'));
+
+        $result = (new GeminiProvider)->complete('system', [['role' => 'user', 'content' => 'go']], [
+            new ToolDefinition('echo', 'x', ['type' => 'object', 'properties' => []]),
+        ]);
+
+        $this->assertSame('echo#0', $result->toolCalls[0]->id);
+        $this->assertSame('SIG-SYNTH', $result->toolCalls[0]->providerSignature);
+
+        Http::fake([self::URL => Http::response($this->textCandidate('done'), 200)]);
+        (new GeminiProvider)->complete('system', [
+            ['role' => 'user', 'content' => 'go'],
+            ['role' => 'assistant', 'content' => null, 'tool_calls' => $result->toolCalls],
+            ['role' => 'tool_result', 'tool_call_id' => 'echo#0', 'content' => '{"r":1}', 'is_error' => false],
+        ], [new ToolDefinition('echo', 'x', ['type' => 'object', 'properties' => []])]);
+
+        $part = Http::recorded()->last()[0]->data()['contents'][1]['parts'][0];
+        $this->assertArrayNotHasKey('id', $part['functionCall']); // synthesised → omitted
+        $this->assertSame('SIG-SYNTH', $part['thoughtSignature']);
+    }
+
+    public function test_a_final_text_response_after_a_signed_call_completes_cleanly(): void
+    {
+        Http::fake([
+            self::URL => Http::sequence()
+                ->push($this->signedFunctionCallCandidate('echo', ['value' => 'ping'], 'SIG'), 200)
+                ->push($this->textCandidate('pong'), 200),
+        ]);
+
+        $agent = new Agent(new GeminiProvider, new ToolRegistry([$this->echoTool()]), 'system prompt');
+        $response = $agent->respond(User::factory()->create(), 'echo ping');
+
+        $this->assertSame(AgentInteractionStatus::Completed, $response->status);
+        $this->assertSame('pong', $response->text);
+        $this->assertSame([['name' => 'echo', 'arguments' => ['value' => 'ping']]], $response->toolsUsed);
+    }
+
+    public function test_a_thought_signature_never_appears_in_the_user_visible_response(): void
+    {
+        Http::fake([
+            self::URL => Http::sequence()
+                ->push($this->signedFunctionCallCandidate('echo', ['value' => 'ping'], 'SECRET-SIGNATURE-VALUE'), 200)
+                ->push($this->textCandidate('Here you go.'), 200),
+        ]);
+
+        $agent = new Agent(new GeminiProvider, new ToolRegistry([$this->echoTool()]), 'system prompt');
+        $response = $agent->respond(User::factory()->create(), 'echo ping');
+
+        $this->assertSame('Here you go.', $response->text);
+        $this->assertStringNotContainsString('SECRET-SIGNATURE-VALUE', (string) $response->text);
+        $this->assertStringNotContainsString('SECRET-SIGNATURE-VALUE', json_encode($response->toolsUsed));
+        $this->assertStringNotContainsString('SECRET-SIGNATURE-VALUE', json_encode($response->draft));
+    }
+
+    public function test_a_thought_signature_never_appears_in_a_provider_exception(): void
+    {
+        Http::fake([self::URL => Http::response(['error' => ['code' => 500, 'message' => 'internal']], 503)]);
+
+        try {
+            (new GeminiProvider)->complete('system', [
+                ['role' => 'user', 'content' => 'go'],
+                ['role' => 'assistant', 'content' => null, 'tool_calls' => [new ToolCall('echo#0', 'echo', [], 'SECRET-SIGNATURE-VALUE')]],
+                ['role' => 'tool_result', 'tool_call_id' => 'echo#0', 'content' => '{"r":1}', 'is_error' => false],
+            ], [new ToolDefinition('echo', 'x', ['type' => 'object', 'properties' => []])]);
+            $this->fail('Expected AiProviderException.');
+        } catch (AiProviderException $e) {
+            $this->assertStringNotContainsString('SECRET-SIGNATURE-VALUE', $e->getMessage());
+            $this->assertStringNotContainsString('SECRET-SIGNATURE-VALUE', (string) $e);
+        }
+    }
+
+    public function test_the_max_tool_iteration_limit_still_applies_when_every_call_is_signed(): void
+    {
+        Http::fake([self::URL => Http::response($this->signedFunctionCallCandidate('echo', ['value' => 'again'], 'SIG'), 200)]);
+
+        $agent = new Agent(new GeminiProvider, new ToolRegistry([$this->echoTool()]), 'system prompt', maxToolIterations: 3);
+        $response = $agent->respond(User::factory()->create(), 'loop');
+
+        $this->assertSame(AgentInteractionStatus::LimitReached, $response->status);
+        Http::assertSentCount(3);
+    }
+
+    public function test_an_unsigned_call_never_gains_a_fabricated_signature_on_replay(): void
+    {
+        $this->fakeOnce($this->textCandidate('done'));
+
+        (new GeminiProvider)->complete('system', [
+            ['role' => 'user', 'content' => 'go'],
+            ['role' => 'assistant', 'content' => null, 'tool_calls' => [new ToolCall('echo#0', 'echo', [])]],
+            ['role' => 'tool_result', 'tool_call_id' => 'echo#0', 'content' => '{"r":1}', 'is_error' => false],
+        ], [new ToolDefinition('echo', 'x', ['type' => 'object', 'properties' => []])]);
+
+        $part = Http::recorded()[0][0]->data()['contents'][1]['parts'][0];
+        $this->assertArrayNotHasKey('thoughtSignature', $part);
+        $this->assertArrayNotHasKey('thoughtSignature', $part['functionCall']);
     }
 
     private function echoTool(): AgentTool

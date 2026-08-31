@@ -41,6 +41,19 @@ use Illuminate\Support\Facades\Http;
  * real Gemini id — a synthesised one is meaningless to Gemini and would
  * only add noise, so it is omitted and Gemini falls back to name+order
  * matching, which is why buildWireContents preserves call/result order.
+ *
+ * Thought signatures (Gemini 3+): each model turn that emits a
+ * `functionCall` carries an opaque `thoughtSignature` on the part
+ * (for parallel calls, only on the first `functionCall` part). Gemini
+ * rejects the next request (HTTP 400) unless that signature is replayed
+ * verbatim in the same part. We capture it into ToolCall::$providerSignature
+ * on parse and re-attach it, byte-for-byte, as a sibling of `functionCall`
+ * when buildWireContents replays that model turn — never decoded,
+ * mutated, synthesised, logged, or surfaced anywhere else. The
+ * documented dummy/bypass signature values are NOT used: real
+ * model-generated calls always carry a real signature. The trailing
+ * text-part signature (which Gemini marks "recommended", not required,
+ * and whose absence does not cause the 400) is a known minor gap.
  */
 class GeminiProvider implements LlmProvider
 {
@@ -168,7 +181,18 @@ class GeminiProvider implements LlmProvider
                         $call['id'] = $toolCall->id;
                     }
 
-                    $parts[] = ['functionCall' => $call];
+                    $part = ['functionCall' => $call];
+
+                    // Gemini 3+ requires the opaque thoughtSignature to be
+                    // replayed verbatim on the exact same part it was
+                    // received on (parallel calls: only the first FC part
+                    // carries one). Never fabricated — only re-attached
+                    // when the originating call actually had one.
+                    if ($toolCall->providerSignature !== null) {
+                        $part['thoughtSignature'] = $toolCall->providerSignature;
+                    }
+
+                    $parts[] = $part;
                 }
 
                 $wire[] = ['role' => 'model', 'parts' => $parts];
@@ -271,10 +295,12 @@ class GeminiProvider implements LlmProvider
             } elseif (isset($part['functionCall'])) {
                 $call = $part['functionCall'];
                 $name = (string) ($call['name'] ?? '');
+                $signature = $part['thoughtSignature'] ?? null;
                 $toolCalls[] = new ToolCall(
                     id: isset($call['id']) && $call['id'] !== '' ? (string) $call['id'] : $name.'#'.$index,
                     name: $name,
                     arguments: is_array($call['args'] ?? null) ? $call['args'] : [],
+                    providerSignature: is_string($signature) && $signature !== '' ? $signature : null,
                 );
                 $index++;
             }

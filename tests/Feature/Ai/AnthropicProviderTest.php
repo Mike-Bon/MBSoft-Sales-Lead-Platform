@@ -66,6 +66,9 @@ class AnthropicProviderTest extends TestCase
         $this->assertSame('search_leads', $result->toolCalls[0]->name);
         $this->assertSame(['status' => 'new'], $result->toolCalls[0]->arguments);
         $this->assertSame('tool_use', $result->stopReason);
+        // Anthropic has no thought-signature concept — the opaque field
+        // added for Gemini 3 stays null and is never sent to Anthropic.
+        $this->assertNull($result->toolCalls[0]->providerSignature);
     }
 
     public function test_the_request_carries_the_system_prompt_separately_from_messages(): void

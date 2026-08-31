@@ -92,7 +92,7 @@ agent is explicitly out of scope for Phase 7.
   `ToolCall`, `ToolDefinition` and every tool were unchanged by the
   Gemini swap.
 - **Model/config:** `LLM_PROVIDER` (default `gemini`), `LLM_API_KEY`,
-  `LLM_MODEL` (default `gemini-2.5-flash`), `LLM_MAX_TOKENS`,
+  `LLM_MODEL` (default `gemini-3.6-flash`), `LLM_MAX_TOKENS`,
   `LLM_TIMEOUT_SECONDS` — all environment-driven
   (`config/services.php`'s `llm` block). Never hard-coded, never
   logged, never exposed to the browser. The model must support function
@@ -108,6 +108,19 @@ agent is explicitly out of scope for Phase 7.
   result with its call. On the return trip it always sends the function
   `name` (Gemini's primary key) in call order — which is why parallel
   and repeated same-function calls stay correctly matched.
+- **Thought signatures (Gemini 3+):** each model turn that emits a
+  `functionCall` carries an opaque `thoughtSignature`; Gemini rejects
+  the next request (HTTP 400) unless it is replayed verbatim on the same
+  part (for parallel calls, only the first `functionCall` part carries
+  one). `GeminiProvider` captures it into the opaque
+  `ToolCall::$providerSignature` field on parse and re-attaches it
+  byte-for-byte on replay — never decoded, fabricated, logged, shown to
+  users, exposed to tools, or written to the audit trail. `Agent.php` is
+  unchanged: it round-trips `ToolCall` objects without interpreting the
+  field. Anthropic has no equivalent and leaves it null. **Known minor
+  gap:** the trailing *text-part* signature (which Gemini marks
+  "recommended", not required, and whose absence does not cause the 400)
+  is not preserved.
 - **Search is not the LLM:** Gemini is only the reasoning/tool-selection
   model. It is given exactly the ToolRegistry's function declarations
   and nothing else — no Google Search grounding, URL-context tool, code
