@@ -7,8 +7,15 @@
 @endphp
 <x-layouts.app>
     <div class="w-full">
-        <flux:heading size="xl" level="1">Fiscal Year Performance</flux:heading>
-        <flux:subheading size="lg" class="mb-4">Operational revenue &amp; units vs the corporate budget workbook</flux:subheading>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <flux:heading size="xl" level="1">Fiscal Year Performance</flux:heading>
+                <flux:subheading size="lg" class="mb-4">Operational revenue &amp; units vs the corporate budget workbook</flux:subheading>
+            </div>
+            @if (auth()->user()->isManager())
+                <flux:button size="sm" icon="adjustments-horizontal" :href="route('performance.fiscal.actuals.index')" wire:navigate>Manage Actuals</flux:button>
+            @endif
+        </div>
 
         <flux:callout icon="information-circle" variant="secondary" class="mb-6">
             <strong>Operational Performance</strong> — monthly phased targets vs monthly actuals imported from the corporate
