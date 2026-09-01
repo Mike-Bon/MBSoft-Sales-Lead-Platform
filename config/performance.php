@@ -30,6 +30,10 @@ return [
 
     'import' => [
         'reject_negative_values' => true,
+
+        // Web "Import Actuals" flow.
+        'max_upload_kb' => (int) env('PERFORMANCE_IMPORT_MAX_UPLOAD_KB', 512),
+        'preview_ttl_minutes' => (int) env('PERFORMANCE_IMPORT_PREVIEW_TTL_MINUTES', 30),
     ],
 
 ];

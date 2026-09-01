@@ -5,6 +5,7 @@ namespace Tests\Feature\Performance;
 use App\Enums\PerformanceImportStatus;
 use App\Enums\PerformanceImportType;
 use App\Models\PerformanceActualLine;
+use App\Models\PerformanceActualLineRevision;
 use App\Models\PerformancePlanLine;
 use App\Models\ReportingUnit;
 use App\Models\Team;
@@ -240,5 +241,43 @@ class PerformanceImportServiceTest extends TestCase
         $this->assertDatabaseCount('organizations', 0);
         $this->assertDatabaseCount('leads', 0);
         $this->assertDatabaseCount('activities', 0);
+    }
+
+    public function test_an_actuals_row_with_both_value_cells_blank_is_skipped_not_an_error(): void
+    {
+        $csv = "fiscal_year,period_month,team_code,reporting_unit_code,actual_units,actual_revenue\n"
+            ."2026,1,CEC,TABUN,,5000\n"
+            ."2026,2,CEC,TABUN,,\n"        // not reported — skipped
+            ."2026,3,CEC,TABUN,,7000\n";
+        $r = $this->service()->import(PerformanceImportType::Actual, $this->write('act_blank.csv', $csv));
+
+        $this->assertTrue($r->committed);
+        $this->assertSame(2, $r->acceptedRows);
+        $this->assertSame(2, PerformanceActualLine::count());
+    }
+
+    public function test_preview_stages_a_batch_without_writing_and_commit_applies_it(): void
+    {
+        $manager = User::factory()->manager()->create();
+        $csv = "fiscal_year,period_month,team_code,reporting_unit_code,actual_units,actual_revenue\n"
+            ."2026,1,CEC,TABUN,,14639.06\n";
+        $path = $this->write('web.csv', $csv);
+
+        $preview = $this->service()->preview(
+            PerformanceImportType::Actual, $path, $manager, 'web.csv', hash_file('sha256', $path), (int) filesize($path),
+        );
+
+        $this->assertTrue($preview->ok);
+        $this->assertFalse($preview->committed);
+        $this->assertSame(PerformanceImportStatus::Previewing, $preview->import->status);
+        $this->assertSame(0, PerformanceActualLine::count());
+        $this->assertSame(64, strlen($preview->import->file_sha256));
+
+        $outcome = $this->service()->commitPreview($preview->import->fresh(), $manager, $preview->import->preview_fingerprint);
+
+        $this->assertTrue($outcome->committed());
+        $this->assertSame(1, PerformanceActualLine::count());
+        $this->assertSame(1, PerformanceActualLineRevision::count());
+        $this->assertSame(PerformanceImportStatus::Completed, $outcome->import->status);
     }
 }

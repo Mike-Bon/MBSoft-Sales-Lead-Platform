@@ -24,6 +24,27 @@ class PerformanceAuthorizer
         return $actor->isManager();
     }
 
+    /**
+     * Who may MAINTAIN operational actuals (bulk CSV import, manual
+     * correction, change history) from the web UI. Manager only — a Team
+     * Head keeps their existing read-only fiscal-performance access and
+     * gets no write affordance in this feature.
+     */
+    public function canManageActuals(User $actor): bool
+    {
+        return $actor->isManager();
+    }
+
+    /**
+     * @throws AuthorizationException
+     */
+    public function authorizeManageActuals(User $actor): void
+    {
+        if (! $this->canManageActuals($actor)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+    }
+
     public function canViewTeam(User $actor, Team $team): bool
     {
         if ($actor->isManager()) {
